@@ -1,0 +1,145 @@
+import { describe, expect, it, vi } from "vitest";
+
+import { addCardToInventory } from "@/services/inventory-upsert";
+
+describe("addCardToInventory", () => {
+  it("validates quantity > 0", async () => {
+    await expect(
+      addCardToInventory(
+        {
+          cardId: "base1-1",
+          setId: "base1",
+          number: "1",
+          name: "Alakazam",
+          quantity: 0,
+          condition: "Near Mint"
+        },
+        {
+          platformOS: "web",
+          getInventoryItemByCardId: vi.fn(),
+          saveInventoryItem: vi.fn(),
+          syncCardPriceWithMatching: vi.fn(),
+          readWebInventoryRows: vi.fn(),
+          writeWebInventoryRows: vi.fn()
+        }
+      )
+    ).rejects.toThrow("La cantidad debe ser un entero mayor que 0.");
+  });
+
+  it("creates new row on web when card does not exist", async () => {
+    const writeWebInventoryRows = vi.fn();
+
+    const result = await addCardToInventory(
+      {
+        cardId: "base1-1",
+        setId: "base1",
+        number: "1",
+        name: "Alakazam",
+        quantity: 2,
+        condition: "Near Mint",
+        isOffline: true
+      },
+      {
+        platformOS: "web",
+        getInventoryItemByCardId: vi.fn(),
+        saveInventoryItem: vi.fn(),
+        syncCardPriceWithMatching: vi.fn(),
+        readWebInventoryRows: vi.fn().mockReturnValue([]),
+        writeWebInventoryRows
+      }
+    );
+
+    expect(result.wasMerged).toBe(false);
+    expect(result.quantity).toBe(2);
+    expect(result.priceSource).toBe("none");
+    expect(writeWebInventoryRows).toHaveBeenCalledTimes(1);
+  });
+
+  it("merges quantity for duplicate card on web", async () => {
+    const writeWebInventoryRows = vi.fn();
+
+    const result = await addCardToInventory(
+      {
+        cardId: "base1-1",
+        setId: "base1",
+        number: "1",
+        name: "Alakazam",
+        quantity: 3,
+        condition: "Lightly Played",
+        isOffline: true
+      },
+      {
+        platformOS: "web",
+        getInventoryItemByCardId: vi.fn(),
+        saveInventoryItem: vi.fn(),
+        syncCardPriceWithMatching: vi.fn(),
+        readWebInventoryRows: vi.fn().mockReturnValue([
+          {
+            id: "inv-existing",
+            cardId: "base1-1",
+            quantity: 2,
+            condition: "Near Mint",
+            priceUsd: 10,
+            priceTimestamp: "2026-03-21T10:00:00.000Z"
+          }
+        ]),
+        writeWebInventoryRows
+      }
+    );
+
+    expect(result.wasMerged).toBe(true);
+    expect(result.quantity).toBe(5);
+    expect(writeWebInventoryRows).toHaveBeenCalledWith(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: "inv-existing",
+          cardId: "base1-1",
+          quantity: 5,
+          condition: "Lightly Played",
+          priceUsd: 10
+        })
+      ])
+    );
+  });
+
+  it("stores fetched price when available on native", async () => {
+    const saveInventoryItem = vi.fn().mockResolvedValue(undefined);
+
+    const result = await addCardToInventory(
+      {
+        cardId: "base1-1",
+        setId: "base1",
+        number: "1",
+        name: "Alakazam",
+        quantity: 1,
+        condition: "Near Mint"
+      },
+      {
+        platformOS: "android",
+        getInventoryItemByCardId: vi.fn().mockResolvedValue(null),
+        saveInventoryItem,
+        syncCardPriceWithMatching: vi.fn().mockResolvedValue({
+          source: "remote",
+          lookupUsed: { cardId: "base1-1" },
+          price: {
+            cardId: "base1-1",
+            currentPriceUsd: 12.5,
+            previousPriceUsd: null,
+            fetchedAt: new Date("2026-03-21T10:00:00.000Z")
+          }
+        }),
+        readWebInventoryRows: vi.fn(),
+        writeWebInventoryRows: vi.fn()
+      }
+    );
+
+    expect(result.priceSource).toBe("remote");
+    expect(saveInventoryItem).toHaveBeenCalledWith(
+      expect.objectContaining({
+        cardId: "base1-1",
+        quantity: 1,
+        priceUsd: 12.5
+      })
+    );
+  });
+});

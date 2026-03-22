@@ -1,0 +1,25 @@
+{
+  "expo": {
+    "name": "Pokemon TCG Collection Manager",
+    "slug": "pokemon-tcg-collection-manager",
+    "scheme": "pokemontcgcollection",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "automatic",
+    "plugins": [
+      "expo-router",
+      "expo-sqlite",
+      "expo-font"
+    ],
+    "web": {
+      "bundler": "metro",
+      "output": "single"
+    },
+    "experiments": {
+      "typedRoutes": true
+    },
+    "android": {
+      "package": "com.anonymous.pokemontcgcollectionmanager"
+    }
+  }
+}
