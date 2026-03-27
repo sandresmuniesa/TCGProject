@@ -93,21 +93,29 @@ describe("refreshInventoryCardPrice", () => {
         totalCollectionValueUsd: 28
       });
 
+    const refreshCardPriceWithVariation = vi.fn().mockResolvedValue({
+      source: "remote",
+      cardId: "base1-1",
+      currentPriceUsd: 14,
+      previousPriceUsd: 12,
+      variationPercent: 16.67,
+      fetchedAt: new Date("2026-03-21T12:00:00.000Z")
+    });
+
     const result = await refreshInventoryCardPrice("inv-1", {
       platformOS: "web",
       getInventoryOverview,
-      refreshCardPriceWithVariation: vi.fn().mockResolvedValue({
-        source: "remote",
-        cardId: "base1-1",
-        currentPriceUsd: 14,
-        previousPriceUsd: 12,
-        variationPercent: 16.67,
-        fetchedAt: new Date("2026-03-21T12:00:00.000Z")
-      }),
+      refreshCardPriceWithVariation,
       readWebInventoryRows,
       writeWebInventoryRows
     });
 
+    expect(refreshCardPriceWithVariation).toHaveBeenCalledWith(
+      expect.objectContaining({
+        setName: "Base Set",
+        condition: "Near Mint"
+      })
+    );
     expect(writeWebInventoryRows).toHaveBeenCalledWith(
       expect.arrayContaining([
         expect.objectContaining({

@@ -8,6 +8,7 @@ const WEB_INVENTORY_ITEMS_KEY = "tcg:inventory:items:v1";
 type AddCardInput = {
   cardId: string;
   setId: string;
+  setName?: string;
   number: string;
   name: string;
   quantity: number;
@@ -106,6 +107,8 @@ async function resolvePriceSnapshot(input: AddCardInput, deps: AddCardDeps) {
     const price = await deps.syncCardPriceWithMatching({
       id: input.cardId,
       setId: input.setId,
+      setName: input.setName,
+      condition: input.condition,
       number: input.number,
       name: input.name
     });

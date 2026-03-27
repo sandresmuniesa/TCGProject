@@ -104,11 +104,22 @@ describe("addCardToInventory", () => {
 
   it("stores fetched price when available on native", async () => {
     const saveInventoryItem = vi.fn().mockResolvedValue(undefined);
+    const syncCardPriceWithMatching = vi.fn().mockResolvedValue({
+      source: "remote",
+      lookupUsed: { cardNumber: "1", cardName: "Alakazam", setName: "Base Set", condition: "Near Mint" },
+      price: {
+        cardId: "base1-1",
+        currentPriceUsd: 12.5,
+        previousPriceUsd: null,
+        fetchedAt: new Date("2026-03-21T10:00:00.000Z")
+      }
+    });
 
     const result = await addCardToInventory(
       {
         cardId: "base1-1",
         setId: "base1",
+        setName: "Base Set",
         number: "1",
         name: "Alakazam",
         quantity: 1,
@@ -118,22 +129,19 @@ describe("addCardToInventory", () => {
         platformOS: "android",
         getInventoryItemByCardId: vi.fn().mockResolvedValue(null),
         saveInventoryItem,
-        syncCardPriceWithMatching: vi.fn().mockResolvedValue({
-          source: "remote",
-          lookupUsed: { cardId: "base1-1" },
-          price: {
-            cardId: "base1-1",
-            currentPriceUsd: 12.5,
-            previousPriceUsd: null,
-            fetchedAt: new Date("2026-03-21T10:00:00.000Z")
-          }
-        }),
+        syncCardPriceWithMatching,
         readWebInventoryRows: vi.fn(),
         writeWebInventoryRows: vi.fn()
       }
     );
 
     expect(result.priceSource).toBe("remote");
+    expect(syncCardPriceWithMatching).toHaveBeenCalledWith(
+      expect.objectContaining({
+        setName: "Base Set",
+        condition: "Near Mint"
+      })
+    );
     expect(saveInventoryItem).toHaveBeenCalledWith(
       expect.objectContaining({
         cardId: "base1-1",

@@ -88,6 +88,7 @@ export default function AddCardScreen() {
       return addCardToInventory({
         cardId: selectedCard.id,
         setId: selectedCard.setId,
+        setName: setNameById.get(selectedCard.setId) ?? undefined,
         number: selectedCard.number,
         name: selectedCard.name,
         quantity,

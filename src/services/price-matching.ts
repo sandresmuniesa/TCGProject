@@ -1,4 +1,5 @@
 import { buildJustTcgLookupCandidates, type CatalogCardForMatching } from "@/services/card-matching";
+import { JustTcgNoMatchError } from "@/services/justtcg-client";
 import { PriceSyncError, syncCardPrice, type CardPriceSyncResult } from "@/services/price-sync";
 import type { JustTcgPriceLookupParams } from "@/services/justtcg-client";
 
@@ -25,6 +26,10 @@ function shouldTryNextCandidate(error: unknown) {
 
   if (!(cause instanceof Error)) {
     return false;
+  }
+
+  if (cause instanceof JustTcgNoMatchError) {
+    return true;
   }
 
   return cause.message.includes("status 400") || cause.message.includes("status 404");

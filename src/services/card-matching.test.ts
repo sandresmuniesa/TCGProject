@@ -3,18 +3,20 @@ import { describe, expect, it } from "vitest";
 import { buildJustTcgLookupCandidates } from "@/services/card-matching";
 
 describe("buildJustTcgLookupCandidates", () => {
-  it("builds ordered lookup candidates for id, set+number and set+name", () => {
+  it("builds ordered lookup candidates prioritizing number+name and set+name", () => {
     const candidates = buildJustTcgLookupCandidates({
       id: "gym1-1",
       setId: "gym1",
+      setName: "Gym Heroes",
+      condition: "Near Mint",
       number: "1",
       name: "Blaine's Moltres"
     });
 
-    expect(candidates[0]).toEqual({ cardId: "gym1-1" });
-    expect(candidates).toContainEqual({ setId: "gym1", cardNumber: "1" });
-    expect(candidates).toContainEqual({ setId: "gym1", cardName: "Blaine's Moltres" });
-    expect(candidates).toContainEqual({ setId: "gym1", cardName: "Blaine s Moltres" });
+    expect(candidates[0]).toEqual({ setId: "gym1", setName: "Gym Heroes", condition: "Near Mint", cardNumber: "1", cardName: "Blaine's Moltres" });
+    expect(candidates).toContainEqual({ setId: "gym1", setName: "Gym Heroes", condition: "Near Mint", cardNumber: "1" });
+    expect(candidates).toContainEqual({ setId: "gym1", setName: "Gym Heroes", condition: "Near Mint", cardName: "Blaine's Moltres" });
+    expect(candidates).toContainEqual({ setId: "gym1", setName: "Gym Heroes", condition: "Near Mint", cardName: "Blaine s Moltres" });
   });
 
   it("deduplicates when name normalization yields the same string as the original", () => {
@@ -22,11 +24,13 @@ describe("buildJustTcgLookupCandidates", () => {
     const candidates = buildJustTcgLookupCandidates({
       id: "base1-1",
       setId: "base1",
+      setName: "Base Set",
+      condition: "Near Mint",
       number: "1",
       name: "Alakazam"
     });
 
-    expect(candidates).toHaveLength(4);
+    expect(candidates).toHaveLength(3);
     // should not contain two identical setId+cardName entries
     const nameOnlyCandidates = candidates.filter((c) => c.cardName === "Alakazam" && !c.cardNumber);
     expect(nameOnlyCandidates).toHaveLength(1);
@@ -37,6 +41,8 @@ describe("buildJustTcgLookupCandidates", () => {
     const candidates = buildJustTcgLookupCandidates({
       id: "xy9-29",
       setId: "xy9",
+      setName: "BREAKpoint",
+      condition: "Near Mint",
       number: "29",
       name: "Farfetch\u2019d"
     });
@@ -48,15 +54,21 @@ describe("buildJustTcgLookupCandidates", () => {
     expect(hasNormalizedCandidate).toBe(true);
   });
 
-  it("normalizes number to lowercase for cardNumber candidates", () => {
+  it("includes both raw and lowercase number candidates when casing differs", () => {
     const candidates = buildJustTcgLookupCandidates({
       id: "set1-SH1",
       setId: "set1",
+      setName: "Neo Destiny",
+      condition: "Near Mint",
       number: "SH1",
       name: "Shining Charizard"
     });
 
-    const numberCandidates = candidates.filter((c) => c.cardNumber !== undefined);
-    expect(numberCandidates.every((c) => c.cardNumber === "sh1")).toBe(true);
+    const numberCandidates = candidates
+      .filter((c): c is { cardNumber: string } => typeof c.cardNumber === "string")
+      .map((c) => c.cardNumber);
+
+    expect(numberCandidates).toContain("SH1");
+    expect(numberCandidates).toContain("sh1");
   });
 });

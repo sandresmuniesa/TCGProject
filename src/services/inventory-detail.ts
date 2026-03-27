@@ -177,6 +177,8 @@ export async function refreshInventoryCardPrice(
   const refreshed = await deps.refreshCardPriceWithVariation({
     cardId: detail.cardId,
     setId: detail.setId,
+    setName: detail.setName,
+    condition: detail.condition,
     cardNumber: detail.number,
     cardName: detail.name
   });

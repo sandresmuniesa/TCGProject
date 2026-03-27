@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
+import { JustTcgNoMatchError } from "@/services/justtcg-client";
 import { PriceSyncError } from "@/services/price-sync";
 import { syncCardPriceWithMatching } from "@/services/price-matching";
 
@@ -59,5 +60,43 @@ describe("syncCardPriceWithMatching", () => {
         }
       )
     ).rejects.toBeInstanceOf(PriceSyncError);
+  });
+
+  it("tries next candidate when upstream returns no match", async () => {
+    const buildLookupCandidates = vi.fn().mockReturnValue([
+      { setId: "base1", cardNumber: "4" },
+      { setId: "base1", cardNumber: "4", cardName: "Charizard" }
+    ]);
+
+    const syncCardPrice = vi
+      .fn()
+      .mockRejectedValueOnce(
+        new PriceSyncError("no cache", new JustTcgNoMatchError("No matching card found for params"))
+      )
+      .mockResolvedValueOnce({
+        source: "remote",
+        price: {
+          cardId: "base1-4",
+          currentPriceUsd: 12.5,
+          previousPriceUsd: null,
+          fetchedAt: new Date("2026-03-21T10:00:00.000Z")
+        }
+      });
+
+    const result = await syncCardPriceWithMatching(
+      {
+        id: "base1-4",
+        setId: "base1",
+        number: "4",
+        name: "Charizard"
+      },
+      {
+        buildLookupCandidates,
+        syncCardPrice
+      }
+    );
+
+    expect(syncCardPrice).toHaveBeenCalledTimes(2);
+    expect(result.lookupUsed).toEqual({ setId: "base1", cardNumber: "4", cardName: "Charizard" });
   });
 });

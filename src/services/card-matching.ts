@@ -1,10 +1,14 @@
+import type { CardCondition } from "@/constants/card-condition";
 import type { JustTcgPriceLookupParams } from "@/services/justtcg-client";
 import type { RemoteCard } from "@/services/types";
 
-export type CatalogCardForMatching = Pick<RemoteCard, "id" | "setId" | "number" | "name">;
+export type CatalogCardForMatching = Pick<RemoteCard, "id" | "setId" | "number" | "name"> & {
+  setName?: string;
+  condition?: CardCondition;
+};
 
 function normalizeCardNumber(value: string) {
-  return value.trim().toLowerCase();
+  return value.trim();
 }
 
 function normalizeCardName(value: string) {
@@ -17,16 +21,25 @@ function normalizeCardName(value: string) {
 }
 
 export function buildJustTcgLookupCandidates(card: CatalogCardForMatching): JustTcgPriceLookupParams[] {
-  const normalizedNumber = normalizeCardNumber(card.number);
+  const rawNumber = normalizeCardNumber(card.number);
+  const normalizedNumber = rawNumber.toLowerCase();
   const normalizedName = normalizeCardName(card.name);
 
   const candidates: JustTcgPriceLookupParams[] = [
-    { cardId: card.id },
-    { setId: card.setId, cardNumber: normalizedNumber },
-    { setId: card.setId, cardNumber: normalizedNumber, cardName: card.name },
-    { setId: card.setId, cardName: card.name },
-    { setId: card.setId, cardName: normalizedName }
+    { setId: card.setId, setName: card.setName, condition: card.condition, cardNumber: rawNumber, cardName: card.name },
+    { setId: card.setId, setName: card.setName, condition: card.condition, cardNumber: rawNumber, cardName: normalizedName },
+    { setId: card.setId, setName: card.setName, condition: card.condition, cardNumber: rawNumber },
+    { setId: card.setId, setName: card.setName, condition: card.condition, cardName: card.name },
+    { setId: card.setId, setName: card.setName, condition: card.condition, cardName: normalizedName }
   ];
+
+  if (normalizedNumber !== rawNumber) {
+    candidates.push(
+      { setId: card.setId, setName: card.setName, condition: card.condition, cardNumber: normalizedNumber, cardName: card.name },
+      { setId: card.setId, setName: card.setName, condition: card.condition, cardNumber: normalizedNumber, cardName: normalizedName },
+      { setId: card.setId, setName: card.setName, condition: card.condition, cardNumber: normalizedNumber }
+    );
+  }
 
   const unique = new Map<string, JustTcgPriceLookupParams>();
 
