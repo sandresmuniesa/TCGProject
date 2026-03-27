@@ -3,6 +3,18 @@ import type { RemoteCard, RemoteSet } from "@/services/types";
 
 const TCGDEX_BASE_URL = "https://api.tcgdex.net/v2/en";
 
+/**
+ * TCGDex asset URLs are returned without quality/extension suffix.
+ * e.g. https://assets.tcgdex.net/en/base/base1/1
+ * Full format: https://assets.tcgdex.net/en/base/base1/1/{quality}.{extension}
+ * We use low.webp as default: compact, transparent background, 245x337.
+ */
+export function buildImageUrl(base: string | null): string | null {
+  if (!base) return null;
+  if (/\.(webp|png|jpg)$/.test(base)) return base;
+  return `${base}/low.webp`;
+}
+
 async function fetchJson<T>(path: string): Promise<T> {
   const response = await fetch(`${TCGDEX_BASE_URL}${path}`);
 
@@ -32,7 +44,7 @@ export async function fetchCardsBySet(setId: string): Promise<RemoteCard[]> {
     setId,
     number: card.localId,
     name: card.name,
-    imageUrl: card.image ?? null
+    imageUrl: buildImageUrl(card.image ?? null)
   }));
 }
 
