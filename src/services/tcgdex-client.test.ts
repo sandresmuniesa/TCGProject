@@ -1,9 +1,33 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { fetchCardsBySet, fetchSets, mapRemoteCardToRow, mapRemoteSetToRow } from "@/services/tcgdex-client";
+import { buildImageUrl, fetchCardsBySet, fetchSets, mapRemoteCardToRow, mapRemoteSetToRow } from "@/services/tcgdex-client";
 
 afterEach(() => {
   vi.unstubAllGlobals();
+});
+
+describe("buildImageUrl", () => {
+  it("appends /low.webp to a base TCGDex asset URL", () => {
+    expect(buildImageUrl("https://assets.tcgdex.net/en/base/base1/1")).toBe(
+      "https://assets.tcgdex.net/en/base/base1/1/low.webp"
+    );
+  });
+
+  it("returns the URL unchanged when it already has a .webp extension", () => {
+    expect(buildImageUrl("https://assets.tcgdex.net/en/base/base1/1/low.webp")).toBe(
+      "https://assets.tcgdex.net/en/base/base1/1/low.webp"
+    );
+  });
+
+  it("returns the URL unchanged when it already has a .png extension", () => {
+    expect(buildImageUrl("https://assets.tcgdex.net/en/base/base1/1/high.png")).toBe(
+      "https://assets.tcgdex.net/en/base/base1/1/high.png"
+    );
+  });
+
+  it("returns null for null input", () => {
+    expect(buildImageUrl(null)).toBeNull();
+  });
 });
 
 describe("mapRemoteSetToRow", () => {
@@ -139,7 +163,7 @@ describe("fetchCardsBySet", () => {
     const cards = await fetchCardsBySet("base1");
 
     expect(cards).toHaveLength(2);
-    expect(cards[0]).toEqual({ id: "base1-4", setId: "base1", number: "4", name: "Charizard", imageUrl: "https://img.url" });
+    expect(cards[0]).toEqual({ id: "base1-4", setId: "base1", number: "4", name: "Charizard", imageUrl: "https://img.url/low.webp" });
     expect(cards[1].imageUrl).toBeNull();
   });
 

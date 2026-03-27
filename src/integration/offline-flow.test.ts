@@ -5,7 +5,7 @@ import { getInventoryOverview } from "@/services/inventory-query";
 import { getInventoryCardDetail, refreshInventoryCardPrice } from "@/services/inventory-detail";
 
 const SETS_KEY = "tcg:catalog:sets:v1";
-const CARDS_KEY = "tcg:catalog:cards:set:base1";
+const CARDS_KEY = "tcg:catalog:cards:set:v2:base1";
 const INVENTORY_KEY = "tcg:inventory:items:v1";
 
 function seedCatalog() {

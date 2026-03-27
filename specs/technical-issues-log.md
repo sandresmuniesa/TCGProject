@@ -106,9 +106,10 @@ Aplicar en este orden:
 - El tiempo total de bootstrap baja de forma medible respecto al baseline actual.
 
 ### [ISSUE-002] Filtro de sets no usable con catalogo grande
-- Estado: Nuevo
+- Estado: Resuelto
 - Prioridad: P2
 - Fecha deteccion: 2026-03-21
+- Fecha resolucion: 2026-03-23
 - Detectado en: web
 - Relacion con roadmap: Fuera de fase (detectado durante F3-T3)
 
@@ -142,9 +143,10 @@ Implementar un selector en pop-up con buscador y seleccion multiple de sets. Est
 - El estado de filtros seleccionados se refleja correctamente en los resultados del catalogo.
 
 ### [ISSUE-003] Imagenes de cartas no visibles en UI
-- Estado: Nuevo
+- Estado: Resuelto
 - Prioridad: P2
 - Fecha deteccion: 2026-03-21
+- Fecha resolucion: 2026-03-23
 - Detectado en: web
 - Relacion con roadmap: Fuera de fase (detectado durante pruebas de F3-T3)
 
@@ -260,4 +262,5 @@ Combinar opciones 3 y 4: implementar un scorer de candidatos que pondere nombre 
 
 ## Decisiones
 
-(Registrar decisiones tomadas sobre cada issue y fecha)
+- **ISSUE-002 (2026-03-23)**: Implementado selector de sets en modal (`SetPickerModal`) con buscador interno y multi-seleccion. Reemplaza el ScrollView horizontal de chips en `add-card.tsx`. Se extendio `CatalogSearchParams` y el repositorio SQLite para aceptar `setIds: string[]`. Los resultados del catalogo filtran por uno, varios, o ningun set. 94 tests existentes pasan sin cambios. Cierre confirmado por validacion funcional del usuario (2026-03-27).
+- **ISSUE-003 (2026-03-23)**: Corregida normalizacion de URL de imagen en `tcgdex-client.ts` — `buildImageUrl()` agrega `/low.webp` (245x337, webp transparente) a URLs base sin extension. Bumpeada clave de cache web de cartas a `v2` para forzar re-descarga de registros obsoletos. Agregada `healCardImageUrls()` en el repositorio (UPDATE SQL idempotente) que se ejecuta al finalizar `syncInitialCardsBySetCatalog` en plataformas nativas para corregir registros SQLite ya persistidos. 98 tests pasan.

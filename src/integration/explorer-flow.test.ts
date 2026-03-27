@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { filterCatalogExplorerSets, getCatalogExplorerSets, getCatalogSetCardsWithOwnership } from "@/services/catalog-explorer";
 
 const SETS_KEY = "tcg:catalog:sets:v1";
-const CARDS_KEY_PREFIX = "tcg:catalog:cards:set:";
+const CARDS_KEY_PREFIX = "tcg:catalog:cards:set:v2:";
 const INVENTORY_KEY = "tcg:inventory:items:v1";
 
 function seedSets() {

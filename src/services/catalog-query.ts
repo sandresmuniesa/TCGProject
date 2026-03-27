@@ -1,11 +1,12 @@
 import { Platform } from "react-native";
 
 const WEB_SETS_CACHE_KEY = "tcg:catalog:sets:v1";
-const WEB_SET_CARDS_CACHE_KEY_PREFIX = "tcg:catalog:cards:set:";
+const WEB_SET_CARDS_CACHE_KEY_PREFIX = "tcg:catalog:cards:set:v2:";
 
 export type CatalogSearchParams = {
   term?: string;
   setId?: string;
+  setIds?: string[];
 };
 
 export type CatalogCardSearchResult = {
@@ -77,9 +78,10 @@ function sortCatalogCards(cards: CatalogCardSearchResult[]) {
 
 function filterCards(cards: CatalogCardSearchResult[], params: CatalogSearchParams) {
   const normalizedTerm = params.term?.trim().toLowerCase();
+  const activeSetIds = params.setIds && params.setIds.length > 0 ? new Set(params.setIds) : params.setId ? new Set([params.setId]) : null;
 
   return cards.filter((card) => {
-    if (params.setId && card.setId !== params.setId) {
+    if (activeSetIds && !activeSetIds.has(card.setId)) {
       return false;
     }
 
@@ -96,7 +98,8 @@ export async function searchCatalogCards(params: CatalogSearchParams, deps: Cata
     return deps.searchNativeCards(params);
   }
 
-  const setIds = params.setId ? [params.setId] : deps.readWebSetIds();
+  const activeSetIds = params.setIds && params.setIds.length > 0 ? params.setIds : params.setId ? [params.setId] : null;
+  const setIds = activeSetIds ?? deps.readWebSetIds();
   const cards = setIds.flatMap((setId) => deps.readWebCardsBySetId(setId));
 
   return sortCatalogCards(filterCards(cards, params));

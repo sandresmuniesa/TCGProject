@@ -3,7 +3,7 @@ import { Platform } from "react-native";
 import { fetchCardsBySet, mapRemoteCardToRow } from "@/services/tcgdex-client";
 
 const WEB_SETS_CACHE_KEY = "tcg:catalog:sets:v1";
-const WEB_SET_CARDS_CACHE_KEY_PREFIX = "tcg:catalog:cards:set:";
+const WEB_SET_CARDS_CACHE_KEY_PREFIX = "tcg:catalog:cards:set:v2:";
 
 export type SyncCardsBySetResult = {
   setId: string;
@@ -181,13 +181,17 @@ export async function syncInitialCardsBySetCatalog(deps?: SyncInitialCardsDeps):
     });
   }
 
-  const { getAllSets, getCardsBySet, upsertCards } = await import("@/db/repositories/catalog-repository");
-
-  return runInitialCardsSync({
+  const { getAllSets, getCardsBySet, upsertCards, healCardImageUrls } = await import("@/db/repositories/catalog-repository");
+  const result = await runInitialCardsSync({
     fetchCardsBySet,
     mapRemoteCardToRow,
     getCardsBySet,
     upsertCards,
     getKnownSetIds: async () => (await getAllSets()).map((set) => set.id)
   });
+
+  await healCardImageUrls();
+
+  return result;
+
 }

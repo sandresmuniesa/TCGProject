@@ -5,7 +5,7 @@ import { calculatePriceVariationPercent } from "@/services/price-variation";
 
 const WEB_INVENTORY_ITEMS_KEY = "tcg:inventory:items:v1";
 const WEB_SETS_CACHE_KEY = "tcg:catalog:sets:v1";
-const WEB_SET_CARDS_CACHE_KEY_PREFIX = "tcg:catalog:cards:set:";
+const WEB_SET_CARDS_CACHE_KEY_PREFIX = "tcg:catalog:cards:set:v2:";
 const WEB_PRICE_CACHE_KEY_PREFIX = "tcg:price:card:";
 
 export type InventoryOverviewItem = {

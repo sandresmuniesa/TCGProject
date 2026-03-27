@@ -4,7 +4,7 @@ import { addCardToInventory } from "@/services/inventory-upsert";
 import { filterInventoryItems, getInventoryOverview, getInventorySetFilterOptions } from "@/services/inventory-query";
 
 const SETS_KEY = "tcg:catalog:sets:v1";
-const CARDS_KEY = "tcg:catalog:cards:set:base1";
+const CARDS_KEY = "tcg:catalog:cards:set:v2:base1";
 const INVENTORY_KEY = "tcg:inventory:items:v1";
 const PRICE_CACHE_KEY_PREFIX = "tcg:price:card:";
 

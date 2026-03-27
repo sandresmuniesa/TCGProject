@@ -5,9 +5,11 @@ import { useRouter } from "expo-router";
 import { Image, Pressable, SafeAreaView, ScrollView, Text, TextInput, View } from "react-native";
 
 import { CARD_CONDITIONS, type CardCondition } from "@/constants/card-condition";
+import { SetPickerModal } from "@/components/set-picker-modal";
 import { syncInitialCardsBySetCatalog } from "@/services/catalog-cards-sync";
 import { searchCatalogCards } from "@/services/catalog-query";
 import { getCatalogSetOptions } from "@/services/catalog-sets-query";
+import { PAGE_SIZE_OPTIONS, paginateResults, type PageSizeOption } from "@/services/pagination";
 import { syncInitialSets } from "@/services/catalog-sync";
 import { addCardToInventory } from "@/services/inventory-upsert";
 import type { CatalogCardSearchResult } from "@/services/catalog-query";
@@ -21,7 +23,10 @@ export default function AddCardScreen() {
   const setSelectedSetId = useAppStore((state) => state.setSelectedSetId);
 
   const [searchTerm, setSearchTerm] = useState("");
-  const [selectedSetId, setLocalSelectedSetId] = useState<string | null>(null);
+  const [selectedSetIds, setSelectedSetIds] = useState<string[]>([]);
+  const [isSetPickerOpen, setIsSetPickerOpen] = useState(false);
+  const [pageSize, setPageSize] = useState<PageSizeOption>(25);
+  const [page, setPage] = useState(0);
   const [selectedCard, setSelectedCard] = useState<CatalogCardSearchResult | null>(null);
   const [quantityInput, setQuantityInput] = useState("1");
   const [condition, setCondition] = useState<CardCondition>("Near Mint");
@@ -50,17 +55,18 @@ export default function AddCardScreen() {
   });
 
   const cardsQuery = useQuery({
-    queryKey: ["catalog-search", searchTerm, selectedSetId],
+    queryKey: ["catalog-search", searchTerm, selectedSetIds],
     queryFn: () =>
       searchCatalogCards({
         term: searchTerm,
-        setId: selectedSetId ?? undefined
+        setIds: selectedSetIds.length > 0 ? selectedSetIds : undefined
       }),
     enabled: cardsSyncQuery.isSuccess
   });
 
   const cards = useMemo(() => cardsQuery.data ?? [], [cardsQuery.data]);
-  const visibleCards = useMemo(() => cards.slice(0, 50), [cards]);
+  const paginatedCards = useMemo(() => paginateResults(cards, page, pageSize), [cards, page, pageSize]);
+  const visibleCards = paginatedCards.items;
   const setNameById = useMemo(() => {
     const map = new Map<string, string>();
 
@@ -127,6 +133,16 @@ export default function AddCardScreen() {
     });
   }, [selectedCard]);
 
+  useEffect(() => {
+    setPage(0);
+  }, [searchTerm, selectedSetIds]);
+
+  useEffect(() => {
+    if (page !== paginatedCards.currentPage) {
+      setPage(paginatedCards.currentPage);
+    }
+  }, [page, paginatedCards.currentPage]);
+
   return (
     <SafeAreaView className="flex-1 bg-mist">
       <ScrollView ref={scrollViewRef} contentContainerStyle={{ padding: 24 }}>
@@ -163,31 +179,37 @@ export default function AddCardScreen() {
               />
 
               <Text className="mt-4 text-sm font-semibold text-ink">Set</Text>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} className="mt-2" contentContainerStyle={{ gap: 8 }}>
-                <Pressable
-                  onPress={() => setLocalSelectedSetId(null)}
-                  className={`rounded-full px-3 py-2 ${selectedSetId == null ? "bg-ink" : "bg-slate-100"}`}
-                >
-                  <Text className={`text-xs font-semibold ${selectedSetId == null ? "text-mist" : "text-slate-700"}`}>
-                    Todos
-                  </Text>
-                </Pressable>
-                {(setsQuery.data ?? []).map((set) => {
-                  const isActive = selectedSetId === set.id;
+              {(() => {
+                const label =
+                  selectedSetIds.length === 0
+                    ? "Todos los sets"
+                    : selectedSetIds.length === 1
+                      ? (setsQuery.data?.find((s) => s.id === selectedSetIds[0])?.name ?? "1 set")
+                      : `${selectedSetIds.length} sets seleccionados`;
 
-                  return (
-                    <Pressable
-                      key={set.id}
-                      onPress={() => setLocalSelectedSetId(set.id)}
-                      className={`rounded-full px-3 py-2 ${isActive ? "bg-ink" : "bg-slate-100"}`}
-                    >
-                      <Text className={`text-xs font-semibold ${isActive ? "text-mist" : "text-slate-700"}`}>
-                        {set.name}
-                      </Text>
-                    </Pressable>
-                  );
-                })}
-              </ScrollView>
+                return (
+                  <Pressable
+                    onPress={() => setIsSetPickerOpen(true)}
+                    className="mt-2 flex-row items-center justify-between rounded-xl border border-slate-300 bg-white px-3 py-2"
+                  >
+                    <Text className="text-sm text-ink">{label}</Text>
+                    <Text className="text-xs text-slate-500">▼</Text>
+                  </Pressable>
+                );
+              })()}
+
+              {setsQuery.isSuccess ? (
+                <SetPickerModal
+                  visible={isSetPickerOpen}
+                  sets={setsQuery.data ?? []}
+                  selectedSetIds={selectedSetIds}
+                  onConfirm={(ids) => {
+                    setSelectedSetIds(ids);
+                    setIsSetPickerOpen(false);
+                  }}
+                  onClose={() => setIsSetPickerOpen(false)}
+                />
+              ) : null}
             </View>
 
             <View className="rounded-2xl border border-slate-200 bg-white p-4">
@@ -240,10 +262,69 @@ export default function AddCardScreen() {
                 })}
               </View>
 
-              {cards.length > visibleCards.length ? (
-                <Text className="mt-3 text-xs text-slate-500">
-                  Mostrando {visibleCards.length} de {cards.length} resultados. Ajusta los filtros para precisar.
-                </Text>
+              {cardsQuery.isSuccess && cards.length > 0 ? (
+                <View className="mt-4 flex-row flex-wrap items-center gap-2">
+                  <Text className="text-xs font-semibold text-slate-600">Registros por pagina:</Text>
+                  {PAGE_SIZE_OPTIONS.map((option) => {
+                    const isActive = pageSize === option;
+
+                    return (
+                      <Pressable
+                        key={option}
+                        onPress={() => {
+                          setPageSize(option);
+                          setPage(0);
+                        }}
+                        className={`rounded-full px-3 py-2 ${isActive ? "bg-ink" : "bg-slate-100"}`}
+                      >
+                        <Text className={`text-xs font-semibold ${isActive ? "text-mist" : "text-slate-700"}`}>
+                          {option}
+                        </Text>
+                      </Pressable>
+                    );
+                  })}
+                </View>
+              ) : null}
+
+              {cardsQuery.isSuccess && cards.length > 0 ? (
+                <View className="mt-4 flex-row items-center justify-between rounded-xl bg-slate-50 px-3 py-2">
+                  <Text className="text-xs text-slate-600">
+                    Mostrando {paginatedCards.startItemNumber}-{paginatedCards.endItemNumber} de {cards.length}
+                  </Text>
+                  <Text className="text-xs text-slate-600">
+                    Pagina {paginatedCards.totalPages === 0 ? 0 : paginatedCards.currentPage + 1} de {paginatedCards.totalPages}
+                  </Text>
+                </View>
+              ) : null}
+
+              {cardsQuery.isSuccess && paginatedCards.totalPages > 1 ? (
+                <View className="mt-4 flex-row items-center justify-between gap-3">
+                  <Pressable
+                    onPress={() => setPage((currentPage) => Math.max(currentPage - 1, 0))}
+                    disabled={paginatedCards.currentPage === 0}
+                    className={`rounded-xl px-4 py-3 ${paginatedCards.currentPage === 0 ? "bg-slate-200" : "bg-slate-100"}`}
+                  >
+                    <Text className={`text-sm font-semibold ${paginatedCards.currentPage === 0 ? "text-slate-400" : "text-slate-700"}`}>
+                      Anterior
+                    </Text>
+                  </Pressable>
+
+                  <Text className="text-xs text-slate-600">
+                    Pagina {paginatedCards.currentPage + 1} / {paginatedCards.totalPages}
+                  </Text>
+
+                  <Pressable
+                    onPress={() => setPage((currentPage) => Math.min(currentPage + 1, paginatedCards.totalPages - 1))}
+                    disabled={paginatedCards.currentPage >= paginatedCards.totalPages - 1}
+                    className={`rounded-xl px-4 py-3 ${paginatedCards.currentPage >= paginatedCards.totalPages - 1 ? "bg-slate-200" : "bg-ink"}`}
+                  >
+                    <Text
+                      className={`text-sm font-semibold ${paginatedCards.currentPage >= paginatedCards.totalPages - 1 ? "text-slate-400" : "text-mist"}`}
+                    >
+                      Siguiente
+                    </Text>
+                  </Pressable>
+                </View>
               ) : null}
             </View>
 
