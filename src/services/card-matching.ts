@@ -26,18 +26,18 @@ export function buildJustTcgLookupCandidates(card: CatalogCardForMatching): Just
   const normalizedName = normalizeCardName(card.name);
 
   const candidates: JustTcgPriceLookupParams[] = [
-    { setId: card.setId, setName: card.setName, condition: card.condition, cardNumber: rawNumber, cardName: card.name },
-    { setId: card.setId, setName: card.setName, condition: card.condition, cardNumber: rawNumber, cardName: normalizedName },
-    { setId: card.setId, setName: card.setName, condition: card.condition, cardNumber: rawNumber },
-    { setId: card.setId, setName: card.setName, condition: card.condition, cardName: card.name },
-    { setId: card.setId, setName: card.setName, condition: card.condition, cardName: normalizedName }
+    { cardId: card.id, setId: card.setId, setName: card.setName, condition: card.condition, cardNumber: rawNumber, cardName: card.name },
+    { cardId: card.id, setId: card.setId, setName: card.setName, condition: card.condition, cardNumber: rawNumber, cardName: normalizedName },
+    { cardId: card.id, setId: card.setId, setName: card.setName, condition: card.condition, cardNumber: rawNumber },
+    { cardId: card.id, setId: card.setId, setName: card.setName, condition: card.condition, cardName: card.name },
+    { cardId: card.id, setId: card.setId, setName: card.setName, condition: card.condition, cardName: normalizedName }
   ];
 
   if (normalizedNumber !== rawNumber) {
     candidates.push(
-      { setId: card.setId, setName: card.setName, condition: card.condition, cardNumber: normalizedNumber, cardName: card.name },
-      { setId: card.setId, setName: card.setName, condition: card.condition, cardNumber: normalizedNumber, cardName: normalizedName },
-      { setId: card.setId, setName: card.setName, condition: card.condition, cardNumber: normalizedNumber }
+      { cardId: card.id, setId: card.setId, setName: card.setName, condition: card.condition, cardNumber: normalizedNumber, cardName: card.name },
+      { cardId: card.id, setId: card.setId, setName: card.setName, condition: card.condition, cardNumber: normalizedNumber, cardName: normalizedName },
+      { cardId: card.id, setId: card.setId, setName: card.setName, condition: card.condition, cardNumber: normalizedNumber }
     );
   }
 

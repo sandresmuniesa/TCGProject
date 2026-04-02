@@ -13,10 +13,10 @@ describe("buildJustTcgLookupCandidates", () => {
       name: "Blaine's Moltres"
     });
 
-    expect(candidates[0]).toEqual({ setId: "gym1", setName: "Gym Heroes", condition: "Near Mint", cardNumber: "1", cardName: "Blaine's Moltres" });
-    expect(candidates).toContainEqual({ setId: "gym1", setName: "Gym Heroes", condition: "Near Mint", cardNumber: "1" });
-    expect(candidates).toContainEqual({ setId: "gym1", setName: "Gym Heroes", condition: "Near Mint", cardName: "Blaine's Moltres" });
-    expect(candidates).toContainEqual({ setId: "gym1", setName: "Gym Heroes", condition: "Near Mint", cardName: "Blaine s Moltres" });
+    expect(candidates[0]).toEqual({ cardId: "gym1-1", setId: "gym1", setName: "Gym Heroes", condition: "Near Mint", cardNumber: "1", cardName: "Blaine's Moltres" });
+    expect(candidates).toContainEqual({ cardId: "gym1-1", setId: "gym1", setName: "Gym Heroes", condition: "Near Mint", cardNumber: "1" });
+    expect(candidates).toContainEqual({ cardId: "gym1-1", setId: "gym1", setName: "Gym Heroes", condition: "Near Mint", cardName: "Blaine's Moltres" });
+    expect(candidates).toContainEqual({ cardId: "gym1-1", setId: "gym1", setName: "Gym Heroes", condition: "Near Mint", cardName: "Blaine s Moltres" });
   });
 
   it("deduplicates when name normalization yields the same string as the original", () => {

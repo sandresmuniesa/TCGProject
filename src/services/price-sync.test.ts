@@ -68,6 +68,31 @@ describe("syncCardPrice", () => {
     expect(upsertPriceCache).not.toHaveBeenCalled();
   });
 
+  it("returns remote price even when cache write fails", async () => {
+    const remotePrice: RemotePrice = {
+      cardId: "card-1",
+      currentPriceUsd: 5.1,
+      previousPriceUsd: 4.8,
+      fetchedAt: new Date("2026-03-21T10:00:00.000Z")
+    };
+
+    const getPriceCache = vi.fn().mockResolvedValue(null);
+    const fetchCardPrice = vi.fn().mockResolvedValue(remotePrice);
+    const mapRemotePriceToRow = vi.fn().mockReturnValue(
+      createCacheRow({ cardId: "card-1", currentPriceUsd: 5.1, previousPriceUsd: 4.8 })
+    );
+    const upsertPriceCache = vi.fn().mockRejectedValue(new Error("FOREIGN KEY constraint failed"));
+
+    const result = await syncCardPrice(
+      { cardId: "card-1" },
+      { fetchCardPrice, mapRemotePriceToRow, getPriceCache, upsertPriceCache }
+    );
+
+    expect(result.source).toBe("remote");
+    expect(result.price.currentPriceUsd).toBe(5.1);
+    expect(upsertPriceCache).toHaveBeenCalledTimes(1);
+  });
+
   it("throws PriceSyncError when network fails and cache does not exist", async () => {
     const getPriceCache = vi.fn().mockResolvedValue(null);
     const fetchCardPrice = vi.fn().mockRejectedValue(new Error("network down"));

@@ -17,6 +17,7 @@ describe("addCardToInventory", () => {
         {
           platformOS: "web",
           getInventoryItemByCardId: vi.fn(),
+          getPriceCacheByCardId: vi.fn().mockResolvedValue(null),
           saveInventoryItem: vi.fn(),
           syncCardPriceWithMatching: vi.fn(),
           readWebInventoryRows: vi.fn(),
@@ -42,6 +43,7 @@ describe("addCardToInventory", () => {
       {
         platformOS: "web",
         getInventoryItemByCardId: vi.fn(),
+        getPriceCacheByCardId: vi.fn().mockResolvedValue(null),
         saveInventoryItem: vi.fn(),
         syncCardPriceWithMatching: vi.fn(),
         readWebInventoryRows: vi.fn().mockReturnValue([]),
@@ -71,6 +73,7 @@ describe("addCardToInventory", () => {
       {
         platformOS: "web",
         getInventoryItemByCardId: vi.fn(),
+        getPriceCacheByCardId: vi.fn().mockResolvedValue(null),
         saveInventoryItem: vi.fn(),
         syncCardPriceWithMatching: vi.fn(),
         readWebInventoryRows: vi.fn().mockReturnValue([
@@ -128,6 +131,7 @@ describe("addCardToInventory", () => {
       {
         platformOS: "android",
         getInventoryItemByCardId: vi.fn().mockResolvedValue(null),
+        getPriceCacheByCardId: vi.fn().mockResolvedValue(null),
         saveInventoryItem,
         syncCardPriceWithMatching,
         readWebInventoryRows: vi.fn(),
@@ -147,6 +151,90 @@ describe("addCardToInventory", () => {
         cardId: "base1-1",
         quantity: 1,
         priceUsd: 12.5
+      })
+    );
+  });
+
+  it("normalizes string price values on native before saving", async () => {
+    const saveInventoryItem = vi.fn().mockResolvedValue(undefined);
+
+    await addCardToInventory(
+      {
+        cardId: "base1-1",
+        setId: "base1",
+        setName: "Base Set",
+        number: "1",
+        name: "Alakazam",
+        quantity: 1,
+        condition: "Near Mint"
+      },
+      {
+        platformOS: "android",
+        getInventoryItemByCardId: vi.fn().mockResolvedValue(null),
+        getPriceCacheByCardId: vi.fn().mockResolvedValue(null),
+        saveInventoryItem,
+        syncCardPriceWithMatching: vi.fn().mockResolvedValue({
+          source: "remote",
+          lookupUsed: { cardNumber: "1", cardName: "Alakazam", setName: "Base Set", condition: "Near Mint" },
+          price: {
+            cardId: "base1-1",
+            currentPriceUsd: "12.5",
+            previousPriceUsd: null,
+            fetchedAt: new Date("2026-03-21T10:00:00.000Z")
+          }
+        }),
+        readWebInventoryRows: vi.fn(),
+        writeWebInventoryRows: vi.fn()
+      }
+    );
+
+    expect(saveInventoryItem).toHaveBeenCalledWith(
+      expect.objectContaining({
+        priceUsd: 12.5
+      })
+    );
+  });
+
+  it("falls back to cached price on native when sync returns unusable price", async () => {
+    const saveInventoryItem = vi.fn().mockResolvedValue(undefined);
+
+    const result = await addCardToInventory(
+      {
+        cardId: "base1-1",
+        setId: "base1",
+        setName: "Base Set",
+        number: "1",
+        name: "Alakazam",
+        quantity: 1,
+        condition: "Near Mint"
+      },
+      {
+        platformOS: "android",
+        getInventoryItemByCardId: vi.fn().mockResolvedValue(null),
+        getPriceCacheByCardId: vi.fn().mockResolvedValue({
+          currentPriceUsd: "9.75",
+          fetchedAt: new Date("2026-03-21T10:00:00.000Z")
+        }),
+        saveInventoryItem,
+        syncCardPriceWithMatching: vi.fn().mockResolvedValue({
+          source: "remote",
+          lookupUsed: { cardNumber: "1", cardName: "Alakazam", setName: "Base Set", condition: "Near Mint" },
+          price: {
+            cardId: "base1-1",
+            currentPriceUsd: Number.NaN,
+            previousPriceUsd: null,
+            fetchedAt: new Date("2026-03-21T10:00:00.000Z")
+          }
+        }),
+        readWebInventoryRows: vi.fn(),
+        writeWebInventoryRows: vi.fn()
+      }
+    );
+
+    expect(result.priceSource).toBe("cache");
+    expect(saveInventoryItem).toHaveBeenCalledWith(
+      expect.objectContaining({
+        priceUsd: 9.75
       })
     );
   });

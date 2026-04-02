@@ -91,6 +91,37 @@ describe("getInventoryOverview", () => {
     expect(result.items[0].name).toBe("Charizard");
   });
 
+  it("normalizes native string price values", async () => {
+    const result = await getInventoryOverview({
+      platformOS: "android",
+      getNativeInventoryDetails: vi.fn().mockResolvedValue([
+        {
+          inventoryId: "inv-1",
+          cardId: "card-1",
+          quantity: 2,
+          condition: "Near Mint",
+          priceUsd: "10.5",
+          priceTimestamp: new Date("2026-03-21T10:00:00.000Z"),
+          addedAt: new Date("2026-03-21T09:00:00.000Z"),
+          cardName: "Charizard",
+          cardNumber: "4",
+          setId: "base1",
+          setName: "Base Set",
+          imageUrl: null,
+          currentPriceUsd: "12"
+        }
+      ]),
+      readWebInventoryRows: vi.fn(),
+      readWebSets: vi.fn(),
+      readWebCardsBySetId: vi.fn(),
+      readWebPriceCacheByCardId: vi.fn()
+    });
+
+    expect(result.items[0].priceUsd).toBe(10.5);
+    expect(result.items[0].currentPriceUsd).toBe(12);
+    expect(result.items[0].variationPercent).toBeCloseTo(14.2857, 3);
+  });
+
   it("builds overview from web cache and sorts by newest first", async () => {
     const result = await getInventoryOverview({
       platformOS: "web",

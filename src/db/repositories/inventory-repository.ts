@@ -58,12 +58,12 @@ export async function deleteInventoryItem(id: string) {
   await db.delete(inventoryTable).where(eq(inventoryTable.id, id));
 }
 
-export async function updateInventoryPriceSnapshotByCardId(cardId: string, priceEur: number, priceTimestamp = new Date()) {
+export async function updateInventoryPriceSnapshotByCardId(cardId: string, priceUsd: number, priceTimestamp = new Date()) {
   const db = getDb();
   await db
     .update(inventoryTable)
     .set({
-      priceEur,
+      priceUsd,
       priceTimestamp
     })
     .where(eq(inventoryTable.cardId, cardId));

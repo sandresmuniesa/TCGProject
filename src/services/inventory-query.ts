@@ -46,7 +46,7 @@ type NativeInventoryDetailRow = {
   cardId: string;
   quantity: number;
   condition: CardCondition;
-  priceUsd: number | null;
+  priceUsd: number | string | null;
   priceTimestamp: Date | null;
   addedAt: Date;
   cardName: string | null;
@@ -54,7 +54,7 @@ type NativeInventoryDetailRow = {
   setId: string | null;
   setName: string | null;
   imageUrl: string | null;
-  currentPriceUsd: number | null;
+  currentPriceUsd: number | string | null;
 };
 
 type WebInventoryRow = {
@@ -126,6 +126,19 @@ function normalizeDate(value: string | number | Date | null | undefined, fallbac
   return Number.isNaN(parsed.getTime()) ? fallback : parsed;
 }
 
+function normalizeNullableNumber(value: number | string | null | undefined) {
+  if (typeof value === "number") {
+    return Number.isFinite(value) ? value : null;
+  }
+
+  if (typeof value === "string") {
+    const parsed = Number.parseFloat(value);
+    return Number.isFinite(parsed) ? parsed : null;
+  }
+
+  return null;
+}
+
 function calculateSummary(items: InventoryOverviewItem[]): InventoryOverview {
   const totalCardsCount = items.reduce((acc, item) => acc + item.quantity, 0);
   const totalCollectionValueUsd = items.reduce((acc, item) => {
@@ -175,22 +188,27 @@ export function filterInventoryItems(items: InventoryOverviewItem[], params: Inv
 }
 
 function mapNativeRowsToOverview(rows: NativeInventoryDetailRow[]) {
-  const items: InventoryOverviewItem[] = rows.map((row) => ({
-    inventoryId: row.inventoryId,
-    cardId: row.cardId,
-    name: row.cardName ?? "Carta sin nombre",
-    setId: row.setId ?? "unknown-set",
-    setName: row.setName ?? "Set desconocido",
-    number: row.cardNumber ?? "-",
-    quantity: row.quantity,
-    condition: row.condition,
-    priceUsd: row.priceUsd ?? null,
-    currentPriceUsd: row.currentPriceUsd ?? null,
-    variationPercent: calculatePriceVariationPercent(row.priceUsd ?? null, row.currentPriceUsd ?? null),
-    imageUrl: row.imageUrl ?? null,
-    priceTimestamp: row.priceTimestamp ?? null,
-    addedAt: row.addedAt
-  }));
+  const items: InventoryOverviewItem[] = rows.map((row) => {
+    const priceUsd = normalizeNullableNumber(row.priceUsd);
+    const currentPriceUsd = normalizeNullableNumber(row.currentPriceUsd);
+
+    return {
+      inventoryId: row.inventoryId,
+      cardId: row.cardId,
+      name: row.cardName ?? "Carta sin nombre",
+      setId: row.setId ?? "unknown-set",
+      setName: row.setName ?? "Set desconocido",
+      number: row.cardNumber ?? "-",
+      quantity: row.quantity,
+      condition: row.condition,
+      priceUsd,
+      currentPriceUsd,
+      variationPercent: calculatePriceVariationPercent(priceUsd, currentPriceUsd),
+      imageUrl: row.imageUrl ?? null,
+      priceTimestamp: row.priceTimestamp ?? null,
+      addedAt: row.addedAt
+    };
+  });
 
   return calculateSummary(items);
 }

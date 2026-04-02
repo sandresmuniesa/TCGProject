@@ -68,7 +68,12 @@ async function runNativePriceSync(params: JustTcgPriceLookupParams, deps: PriceS
       fetchedAt: new Date()
     };
 
-    await deps.upsertPriceCache(persisted);
+    try {
+      await deps.upsertPriceCache(persisted);
+    } catch {
+      // A cache write failure (e.g. FK violation when cardId is a JustTCG ID)
+      // must not prevent the fetched price from being returned to the caller.
+    }
 
     return {
       source: "remote",

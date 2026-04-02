@@ -4,6 +4,7 @@ import type { CardCondition } from "@/constants/card-condition";
 import { syncCardPriceWithMatching } from "@/services/price-matching";
 
 const WEB_INVENTORY_ITEMS_KEY = "tcg:inventory:items:v1";
+const WEB_PRICE_CACHE_KEY_PREFIX = "tcg:price:card:";
 
 type AddCardInput = {
   cardId: string;
@@ -29,9 +30,9 @@ type InventoryRowShape = {
   cardId: string;
   quantity: number;
   condition: CardCondition;
-  priceUsd?: number | null;
-  priceTimestamp?: Date | null;
-  addedAt?: Date;
+  priceUsd: number | null;
+  priceTimestamp: Date | null;
+  addedAt: Date;
 };
 
 type WebInventoryRow = {
@@ -47,10 +48,17 @@ type WebInventoryRow = {
 type AddCardDeps = {
   platformOS: string;
   getInventoryItemByCardId: (cardId: string) => Promise<InventoryRowShape | null>;
+  getPriceCacheByCardId: (cardId: string) => Promise<{ currentPriceUsd: number | string | null; fetchedAt: Date | null } | null>;
   saveInventoryItem: (item: InventoryRowShape) => Promise<void>;
   syncCardPriceWithMatching: typeof syncCardPriceWithMatching;
   readWebInventoryRows: () => WebInventoryRow[];
   writeWebInventoryRows: (rows: WebInventoryRow[]) => void;
+};
+
+type ResolvedPriceSnapshot = {
+  source: "remote" | "cache" | "none";
+  priceUsd: number | null;
+  fetchedAt: Date | null;
 };
 
 function createInventoryId() {
@@ -76,12 +84,52 @@ function readWebCacheArray<T>(key: string): T[] {
   }
 }
 
+function readWebCache<T>(key: string): T | null {
+  if (typeof window === "undefined" || !window.localStorage) {
+    return null;
+  }
+
+  const rawValue = window.localStorage.getItem(key);
+
+  if (!rawValue) {
+    return null;
+  }
+
+  try {
+    return JSON.parse(rawValue) as T;
+  } catch {
+    return null;
+  }
+}
+
 function writeWebCache(key: string, value: unknown) {
   if (typeof window === "undefined" || !window.localStorage) {
     return;
   }
 
   window.localStorage.setItem(key, JSON.stringify(value));
+}
+
+function normalizeNullableNumber(value: number | string | null | undefined) {
+  if (typeof value === "number") {
+    return Number.isFinite(value) ? value : null;
+  }
+
+  if (typeof value === "string") {
+    const parsed = Number.parseFloat(value);
+    return Number.isFinite(parsed) ? parsed : null;
+  }
+
+  return null;
+}
+
+function normalizeDate(value: string | number | Date | null | undefined) {
+  if (value == null) {
+    return null;
+  }
+
+  const parsed = new Date(value);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
 }
 
 function validateInput(input: AddCardInput) {
@@ -94,7 +142,7 @@ function validateInput(input: AddCardInput) {
   }
 }
 
-async function resolvePriceSnapshot(input: AddCardInput, deps: AddCardDeps) {
+async function resolvePriceSnapshot(input: AddCardInput, deps: AddCardDeps): Promise<ResolvedPriceSnapshot> {
   if (input.isOffline) {
     return {
       source: "none" as const,
@@ -113,18 +161,35 @@ async function resolvePriceSnapshot(input: AddCardInput, deps: AddCardDeps) {
       name: input.name
     });
 
-    return {
-      source: price.source,
-      priceUsd: price.price.currentPriceUsd,
-      fetchedAt: new Date()
-    };
+    const priceUsd = normalizeNullableNumber(price.price.currentPriceUsd);
+
+    if (priceUsd != null) {
+      return {
+        source: price.source,
+        priceUsd,
+        fetchedAt: normalizeDate(price.price.fetchedAt) ?? new Date()
+      };
+    }
   } catch {
+    // Fall back to the local cache when remote sync is unavailable.
+  }
+
+  const cachedPrice = await deps.getPriceCacheByCardId(input.cardId);
+  const cachedPriceUsd = normalizeNullableNumber(cachedPrice?.currentPriceUsd);
+
+  if (cachedPriceUsd != null) {
     return {
-      source: "none" as const,
-      priceUsd: null,
-      fetchedAt: null
+      source: "cache",
+      priceUsd: cachedPriceUsd,
+      fetchedAt: normalizeDate(cachedPrice?.fetchedAt)
     };
   }
+
+  return {
+    source: "none" as const,
+    priceUsd: null,
+    fetchedAt: null
+  };
 }
 
 async function runNativeAdd(input: AddCardInput, deps: AddCardDeps): Promise<AddCardToInventoryResult> {
@@ -187,6 +252,26 @@ const defaultDeps: AddCardDeps = {
   getInventoryItemByCardId: async (cardId) => {
     const { getInventoryItemByCardId } = await import("@/db/repositories/inventory-repository");
     return getInventoryItemByCardId(cardId);
+  },
+  getPriceCacheByCardId: async (cardId) => {
+    if (Platform.OS === "web") {
+      const cached = readWebCache<{
+        currentPriceUsd?: number | string | null;
+        fetchedAt?: string | number | Date | null;
+      }>(`${WEB_PRICE_CACHE_KEY_PREFIX}${cardId}`);
+
+      if (!cached) {
+        return null;
+      }
+
+      return {
+        currentPriceUsd: cached.currentPriceUsd ?? null,
+        fetchedAt: normalizeDate(cached.fetchedAt)
+      };
+    }
+
+    const { getPriceCache } = await import("@/db/repositories/price-cache-repository");
+    return getPriceCache(cardId);
   },
   saveInventoryItem: async (item) => {
     const { saveInventoryItem } = await import("@/db/repositories/inventory-repository");
