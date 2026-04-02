@@ -63,9 +63,10 @@ Como verificamos que quedo resuelto.
 ## Incidencias activas
 
 ### [ISSUE-001] Ingesta inicial de cartas lenta y con rechazos de API
-- Estado: Nuevo
+- Estado: Resuelto
 - Prioridad: P1
 - Fecha deteccion: 2026-03-21
+- Fecha resolucion: 2026-04-02
 - Detectado en: web
 - Relacion con roadmap: Fuera de fase (impacta operativa de F2-T2)
 
@@ -218,9 +219,10 @@ Aplicar documentacion minima + validacion de entorno para detectar ausencia de A
 - Si falta API key, la app informa claramente el motivo.
 
 ### [ISSUE-005] Correlacion incorrecta de cartas entre TCGDex y JustTCG
-- Estado: Nuevo
+- Estado: Resuelto
 - Prioridad: P1
 - Fecha deteccion: 2026-03-21
+- Fecha resolucion: 2026-04-02
 - Detectado en: web
 - Relacion con roadmap: Fuera de fase (afecta F2-T4, F3-T5)
 
@@ -262,5 +264,7 @@ Combinar opciones 3 y 4: implementar un scorer de candidatos que pondere nombre 
 
 ## Decisiones
 
+- **ISSUE-001 (2026-04-02)**: Resuelto por el usuario. Cierre confirmado (2026-04-02).
 - **ISSUE-002 (2026-03-23)**: Implementado selector de sets en modal (`SetPickerModal`) con buscador interno y multi-seleccion. Reemplaza el ScrollView horizontal de chips en `add-card.tsx`. Se extendio `CatalogSearchParams` y el repositorio SQLite para aceptar `setIds: string[]`. Los resultados del catalogo filtran por uno, varios, o ningun set. 94 tests existentes pasan sin cambios. Cierre confirmado por validacion funcional del usuario (2026-03-27).
 - **ISSUE-003 (2026-03-23)**: Corregida normalizacion de URL de imagen en `tcgdex-client.ts` — `buildImageUrl()` agrega `/low.webp` (245x337, webp transparente) a URLs base sin extension. Bumpeada clave de cache web de cartas a `v2` para forzar re-descarga de registros obsoletos. Agregada `healCardImageUrls()` en el repositorio (UPDATE SQL idempotente) que se ejecuta al finalizar `syncInitialCardsBySetCatalog` en plataformas nativas para corregir registros SQLite ya persistidos. 98 tests pasan.
+- **ISSUE-005 (2026-04-02)**: Resuelto por el usuario. Cierre confirmado (2026-04-02).
