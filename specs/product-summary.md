@@ -33,7 +33,8 @@ Hoy la gestion suele estar dispersa entre notas, hojas de calculo y webs de prec
   - Proveedor de precios: JustTCG.
   - Si tcgdex.dev no ofrece precio, JustTCG sera la fuente de precio principal.
 - Moneda:
-  - Solo EUR para MVP.
+  - La moneda de precio del MVP es **USD**.
+  - Nota: la decision inicial de usar EUR fue descartada al confirmar que JustTCG — proveedor de precios seleccionado — retorna precios exclusivamente en USD.
 
 ## Escenarios principales de uso
 
@@ -125,3 +126,8 @@ Nota: Los campos del dominio se alinearan con el proveedor de cartas para evitar
 - Poder consultar en menos de 10 segundos si una carta ya esta en coleccion.
 - Poder ver precio y variacion de una carta en su detalle.
 - Poder consultar al menos una parte util de la coleccion sin conexion.
+
+## Estado del MVP
+
+- **Completado** (abril 2026).
+- Todas las tareas del plan de implementacion (F1 a F4) finalizadas. Ver `MVP/development-tasks.md` para detalle.

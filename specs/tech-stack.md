@@ -14,7 +14,8 @@ Extraídos de `product-summary.md` y `mvp-spec.md`:
 - **Navegador como plataforma prioritaria de desarrollo**: la primera validación y el ciclo principal de pruebas deben ocurrir en web.
 - **Single-user sin autenticación en MVP**: no se justifica un backend propio ni infraestructura de server.
 - **Offline parcial**: el inventario y los últimos precios deben ser consultables sin conexión.
-- **Dos APIs externas**: tcgdex.dev para catálogo (gratuita, sin clave) y JustTCG para precios.
+- **Dos APIs externas**: tcgdex.dev para catálogo (gratuita, sin clave) y JustTCG para precios (requiere API key vía `EXPO_PUBLIC_JUSTTCG_API_KEY`).
+- **Moneda de precios**: USD (JustTCG retorna precios en USD; la denominación inicial EUR fue descartada al validar la API).
 - **Persistencia local estructurada**: búsqueda por nombre, filtro por set, relación entre inventario y catálogo.
 - **Velocidad al mercado**: MVP enfocado, sin over-engineering.
 - **Cobertura de calidad explícita**: el MVP debe incluir tests unitarios e integración.
@@ -34,7 +35,7 @@ Extraídos de `product-summary.md` y `mvp-spec.md`:
 | ORM | Drizzle ORM | Type-safe, compatible con expo-sqlite, migraciones declarativas. |
 | Estilo | NativeWind (Tailwind CSS para RN) | Clases de Tailwind en componentes React Native, misma sintaxis en web y móvil. |
 | API Catálogo | tcgdex.dev REST API | Gratuita, sin clave, catálogo completo de sets y cartas. |
-| API Precios | JustTCG | Fuente de precios en EUR para el MVP. |
+| API Precios | JustTCG (`justtcg-js`) | Fuente de precios en USD para el MVP. Requiere API key `EXPO_PUBLIC_JUSTTCG_API_KEY`. |
 | Testing | Vitest + React Testing Library | Cobertura rápida de tests unitarios e integración para lógica, hooks y pantallas. |
 | Build y distribución | Expo EAS Build | Generación de APK/IPA en la nube sin configuración nativa local. |
 | Deploy web | Vercel | Export estático de Expo Web, despliegue gratuito y sencillo. |
@@ -95,14 +96,15 @@ Justificación: El catálogo de tcgdex puede contener miles de cartas. La spec r
 
 ```sql
 -- Catálogo cacheado de tcgdex
-cards (id, set_id, number, name, image_url, fetched_at)
 sets  (id, name, logo_url, total_cards, fetched_at)
+cards (id, set_id, number, name, image_url, fetched_at)
 
 -- Inventario personal
-inventory (id, card_id, quantity, price_eur, price_timestamp, added_at)
+inventory (id, card_id, quantity, condition, price_usd, price_timestamp, added_at)
+-- condition: 'Near Mint' | 'Lightly Played' | 'Moderately Played' | 'Heavily Played' | 'Damaged'
 
--- Cache de precios de JustTCG
-price_cache (card_id, current_price_eur, previous_price_eur, fetched_at)
+-- Cache de precios de JustTCG (moneda: USD)
+price_cache (card_id, current_price_usd, previous_price_usd, fetched_at)
 ```
 
 ---
@@ -141,12 +143,16 @@ Justificación: el MVP exige cobertura de tests unitarios e integración. Vitest
   - `GET /sets/{id}/cards` — cartas de un set.
   - `GET /cards/{id}` — detalle de carta.
 - Estrategia: descarga completa al primer inicio, almacenada en SQLite. Actualización manual posterior.
+- **Sincronización robusta**: concurrencia limitada por lotes, reintentos con backoff exponencial y jitter, y progreso persistido por set. La sincronización puede reanudarse tras fallo de red sin reiniciar desde cero. Ver `MVP/technical-issues-log.md` ISSUE-001.
+- **Normalización de URLs de imagen**: se añade el sufijo `/low.webp` a URLs base sin extensión para obtener thumbnails (245×337, formato webp). En web, la clave de caché de cartas está versionada (`v2`) para forzar re-descarga ante cambios de mapeo. Ver `MVP/technical-issues-log.md` ISSUE-003.
 
 #### JustTCG
 
-- Fuente de precios elegida para el MVP.
-- Estrategia: llamada bajo demanda al entrar al detalle o al pulsar "Refrescar precio". Resultado cacheado en `price_cache`.
-- Riesgo abierto a validar en implementación: disponibilidad, límites de uso y formato exacto de respuesta.
+- Fuente de precios elegida para el MVP. Integración via paquete npm `justtcg-js`.
+- **Autenticación**: requiere variable de entorno `EXPO_PUBLIC_JUSTTCG_API_KEY`. Sin ella la app opera sin precio pero no falla de forma bloqueante.
+- **Moneda**: USD. Los campos de datos usan el sufijo `_usd` en toda la capa de persistencia y servicios.
+- **Estrategia de consulta**: llamada bajo demanda al entrar al detalle o al pulsar "Refrescar precio". Resultado cacheado en `price_cache`.
+- **Matching entre tcgdex y JustTCG**: los IDs de set no son compatibles entre ambas APIs. Se resuelve construyendo múltiples candidatos de búsqueda (nombre de carta + número, con variantes normalizadas) y seleccionando el resultado con mayor similitud de nombre de set. El match elegido se persiste en cache para evitar re-evaluación. Ver `MVP/technical-issues-log.md` ISSUE-005.
 
 ---
 
