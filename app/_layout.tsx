@@ -28,6 +28,7 @@ export default function RootLayout() {
         <Stack.Screen name="sets/index" options={{ title: "Sets" }} />
         <Stack.Screen name="sets/[setId]" options={{ title: "Cartas del set" }} />
         <Stack.Screen name="inventory/[inventoryId]" options={{ title: "Detalle carta" }} />
+        <Stack.Screen name="card/[cardId]" options={{ title: "Detalle del catálogo" }} />
       </Stack>
     </AppProviders>
   );

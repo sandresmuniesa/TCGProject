@@ -81,3 +81,21 @@ export async function searchCatalogCards(params: SearchCatalogCardsParams) {
     .where(and(whereClauses[0], whereClauses[1]))
     .orderBy(asc(cardsTable.name), asc(cardsTable.number));
 }
+
+export async function getCardWithSetById(cardId: string) {
+  const db = getDb();
+  const rows = await db
+    .select({
+      id: cardsTable.id,
+      setId: cardsTable.setId,
+      number: cardsTable.number,
+      name: cardsTable.name,
+      imageUrl: cardsTable.imageUrl,
+      setName: setsTable.name
+    })
+    .from(cardsTable)
+    .innerJoin(setsTable, eq(cardsTable.setId, setsTable.id))
+    .where(eq(cardsTable.id, cardId))
+    .limit(1);
+  return rows[0] ?? null;
+}

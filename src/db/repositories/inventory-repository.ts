@@ -90,6 +90,24 @@ export async function deleteInventoryItem(id: string) {
   await db.delete(inventoryTable).where(eq(inventoryTable.id, id));
 }
 
+export async function getInventoryCopiesByCardId(cardId: string) {
+  const db = getDb();
+  const rows = await db
+    .select({
+      inventoryId: inventoryTable.id,
+      collectionId: inventoryTable.collectionId,
+      collectionName: collectionsTable.name,
+      quantity: inventoryTable.quantity,
+      condition: inventoryTable.condition,
+      priceUsd: inventoryTable.priceUsd,
+      priceTimestamp: inventoryTable.priceTimestamp
+    })
+    .from(inventoryTable)
+    .leftJoin(collectionsTable, eq(inventoryTable.collectionId, collectionsTable.id))
+    .where(eq(inventoryTable.cardId, cardId));
+  return rows;
+}
+
 /**
  * Updates the price snapshot for a specific inventory entry by its inventoryId.
  * Replaces the previous updateInventoryPriceSnapshotByCardId (which updated all

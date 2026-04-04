@@ -1,7 +1,9 @@
+import { Platform } from "react-native";
+
 import { JustTCG, type Card } from "justtcg-js";
 import type { PriceCacheRow } from "@/db/schema";
-import type { CardCondition } from "@/constants/card-condition";
-import type { RemotePrice } from "@/services/types";
+import { CARD_CONDITIONS, type CardCondition } from "@/constants/card-condition";
+import type { CardConditionPrices, ConditionPriceEntry, RemotePrice } from "@/services/types";
 
 export type JustTcgPriceLookupParams = {
   cardId?: string;
@@ -170,6 +172,111 @@ export async function fetchCardPrice(params: JustTcgPriceLookupParams): Promise<
     currentPriceUsd: variant.price,
     previousPriceUsd: null, // previous price is managed by price-sync from cache
     fetchedAt: new Date(),
+  };
+}
+
+// ---------------------------------------------------------------------------
+// fetchCardConditionPrices — prices for all 5 conditions in a single call
+// ---------------------------------------------------------------------------
+
+type FetchConditionPricesDeps = {
+  persistNmPrice: (entry: PriceCacheRow) => Promise<void>;
+};
+
+const WEB_PRICE_CACHE_KEY_PREFIX = "tcg:price:card:";
+
+const defaultFetchConditionPricesDeps: FetchConditionPricesDeps = {
+  persistNmPrice: async (entry) => {
+    if (Platform.OS === "web") {
+      if (typeof window !== "undefined" && window.localStorage) {
+        window.localStorage.setItem(
+          `${WEB_PRICE_CACHE_KEY_PREFIX}${entry.cardId}`,
+          JSON.stringify(entry)
+        );
+      }
+    } else {
+      const { upsertPriceCache } = await import("@/db/repositories/price-cache-repository");
+      await upsertPriceCache(entry);
+    }
+  }
+};
+
+function pickBestVariantForCondition(card: Card, condition: CardCondition): number | null {
+  if (!card.variants || card.variants.length === 0) {
+    return null;
+  }
+
+  const candidates = card.variants.filter((v) => v.condition === condition && v.price != null);
+
+  if (candidates.length === 0) {
+    return null;
+  }
+
+  // RN-05: prefer Normal printing; if not present, take the highest price
+  const normalVariant = candidates.find((v) => v.printing === "Normal");
+  if (normalVariant) {
+    return normalVariant.price ?? null;
+  }
+
+  let best = candidates[0];
+  for (const v of candidates.slice(1)) {
+    if ((v.price ?? 0) > (best.price ?? 0)) {
+      best = v;
+    }
+  }
+  return best.price ?? null;
+}
+
+export async function fetchCardConditionPrices(
+  params: JustTcgPriceLookupParams,
+  deps: FetchConditionPricesDeps = defaultFetchConditionPricesDeps
+): Promise<CardConditionPrices> {
+  if (!params.cardNumber && !params.cardName) {
+    throw new JustTcgNoMatchError("Price lookup requires cardNumber or cardName.");
+  }
+
+  const client = getClient();
+
+  const response = await client.v1.cards.get({
+    game: "Pokemon",
+    ...(params.cardName && { query: params.cardName }),
+    ...(params.cardNumber && { number: params.cardNumber }),
+    limit: 20,
+    condition: ["NM", "LP", "MP", "HP", "DMG"],
+  });
+
+  if (response.error) {
+    throw new Error(`JustTCG API error: ${response.error} (${response.code})`);
+  }
+
+  const cards = response.data as Card[];
+
+  if (!cards || cards.length === 0) {
+    throw new JustTcgNoMatchError(`No card found for params: ${JSON.stringify(params)}`);
+  }
+
+  const card = pickBestCard(cards, params);
+
+  const prices: ConditionPriceEntry[] = CARD_CONDITIONS.map((condition) => ({
+    condition,
+    priceUsd: pickBestVariantForCondition(card, condition),
+  }));
+
+  const nmPrice = prices.find((p) => p.condition === "Near Mint")?.priceUsd ?? null;
+  if (nmPrice != null) {
+    await deps.persistNmPrice({
+      cardId: params.cardId ?? card.id,
+      currentPriceUsd: nmPrice,
+      previousPriceUsd: null,
+      fetchedAt: new Date(),
+    });
+  }
+
+  return {
+    cardId: params.cardId ?? card.id,
+    prices,
+    fetchedAt: new Date(),
+    source: "remote",
   };
 }
 

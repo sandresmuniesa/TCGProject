@@ -261,6 +261,21 @@ La pantalla `/card/[cardId]` requiere:
 | CA-09 | El badge "En inventario" en el explorador de sets muestra la cantidad total de copias en todas las colecciones y no actúa como enlace directo al inventario. |
 | CA-10 | El precio NM obtenido en el detalle de catálogo queda reflejado en `price_cache`, manteniendo la coherencia de variación de precio en el inventario. |
 
+### Estado de validación de CAs (T-19)
+
+| CA | Tipo de verificación | Tests que lo cubren | Estado |
+|---|---|---|---|
+| CA-01 | ✓ Manual — código inspeccionado | T-15: `Pressable` en `app/sets/[setId].tsx` navega a `/card/{id}` | ✓ |
+| CA-02 | ✓ Automatizado | T-17 Flow 1: `getCatalogCardMetadata` retorna datos del catálogo local sin llamar a JustTCG; T-09: screen usa query independiente para metadata | ✓ |
+| CA-03 | ✓ Automatizado | T-17 Flow 2: `fetchCardConditionPrices` con mock de JustTCG retorna las 5 condiciones; T-03: unit tests de `justtcg-client` | ✓ |
+| CA-04 | ✓ Manual + Automatizado | T-10: rama offline en `PricesSection` usa `cachedPriceQuery` para NM y muestra "No disponible" para las demás; `offline-flow.test.ts` cubre la capa de servicios sin conexión | ✓ |
+| CA-05 | ✓ Automatizado | T-11: `PricesSection` captura `JustTcgNoMatchError` y muestra mensaje sin romper la pantalla; T-03 test (d): `fetchCardConditionPrices` propaga `JustTcgNoMatchError` cuando no hay match | ✓ |
+| CA-06 | ✓ Automatizado | T-17 Flow 3: `getCopiesForCard` retorna copias con `collectionName`; T-07: tests unitarios del servicio | ✓ |
+| CA-07 | ✓ Manual — código inspeccionado | T-09: cada `Pressable` en la sección "Mis copias" llama a `router.push(\`/inventory/${copy.inventoryId}\`)` | ✓ |
+| CA-08 | ✓ Automatizado | T-14: `AddCardModal` cierra y llama `onClose` tras confirmar; T-17 Flow 4: `addCardToInventory` + `getCopiesForCard` refleja la nueva copia; T-13: modal integrado con invalidación de query `["inventory-copies"]` | ✓ |
+| CA-09 | ✓ Manual — código inspeccionado | T-16: badge en `app/sets/[setId].tsx` es `<View>` estático (sin `Pressable` ni `href`) | ✓ |
+| CA-10 | ✓ Automatizado | T-17 Flow 2 test (b): `localStorage.getItem("tcg:price:card:base1-4")` verificado tras `fetchCardConditionPrices`; T-03 test (e): `persistNmPrice` persist en cache | ✓ |
+
 ---
 
 ## 9. Supuestos y decisiones abiertas

@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 
 import { useQuery } from "@tanstack/react-query";
-import { useLocalSearchParams } from "expo-router";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import { Image, Pressable, SafeAreaView, ScrollView, Text, TextInput, View } from "react-native";
 
 import { getCatalogExplorerSets, getCatalogSetCardsWithOwnership } from "@/services/catalog-explorer";
@@ -10,6 +10,7 @@ import { syncInitialSets } from "@/services/catalog-sync";
 
 export default function SetCardsExplorerScreen() {
   const params = useLocalSearchParams<{ setId?: string }>();
+  const router = useRouter();
   const [searchTerm, setSearchTerm] = useState("");
   const setId = params.setId;
 
@@ -141,7 +142,13 @@ export default function SetCardsExplorerScreen() {
         ) : null}
 
         {(cardsQuery.data ?? []).map((card) => (
-          <View key={card.id} className="rounded-2xl border border-slate-200 bg-white p-4">
+          <Pressable
+            key={card.id}
+            onPress={() => router.push(`/card/${card.id}`)}
+            accessibilityRole="button"
+            accessibilityLabel={`Ver detalle de ${card.name}`}
+            className="rounded-2xl border border-slate-200 bg-white p-4"
+          >
             <View className="flex-row gap-3">
               {card.imageUrl ? (
                 <Image
@@ -178,7 +185,7 @@ export default function SetCardsExplorerScreen() {
                 </View>
               </View>
             </View>
-          </View>
+          </Pressable>
         ))}
         </View>
       </ScrollView>
