@@ -164,11 +164,14 @@ La pantalla `/card/[cardId]` requiere:
 **Precondiciones:** —
 
 **Pasos:**
-1. Se invoca el flujo de alta definido en `multi-collections-spec.md` §5.4, con la carta ya pre-seleccionada.
-2. El usuario solo necesita seleccionar colección, cantidad y condición.
-3. Al confirmar, se regresa al detalle de carta con la sección "Mis copias" actualizada.
+1. Se abre un modal directamente sobre la pantalla `/card/[cardId]` con la carta ya pre-seleccionada.
+2. El modal contiene los campos de selección: colección, cantidad y condición (equivalentes al flujo de alta definido en `multi-collections-spec.md` §5.4).
+3. Al confirmar, el modal se cierra y la sección “Mis copias” se actualiza sin abandonar la pantalla.
+4. Al cancelar, el modal se cierra sin cambios.
 
-**Postcondiciones:** La carta está en el inventario de la colección seleccionada.
+**Postcondiciones:** La carta está en el inventario de la colección seleccionada. El usuario permanece en `/card/[cardId]`.
+
+**UI hints:** El modal puede reutilizar el componente de alta si existe uno genérico. No debe navegar a `/add-card`.
 
 ---
 
@@ -205,7 +208,7 @@ La pantalla `/card/[cardId]` requiere:
    | `DMG` | Damaged |
 
 4. Si hay múltiples variants para la misma condición (ej. Normal y Holo), se toma el de tipo `Normal` preferentemente; si no hay Normal, se toma el de precio más alto.
-5. El resultado se devuelve como `CardConditionPrices` y se cachea en TanStack Query con `staleTime = 5 minutos`.
+5. El resultado se devuelve como `CardConditionPrices` y se cachea en TanStack Query con `staleTime` configurable vía la variable de entorno `PRICES_STALE_TIME_MS` (valor por defecto: 1 hora = `3600000` ms).
 6. El precio NM (o el mejor disponible) se persiste en `price_cache` para mantener la coherencia con el modelo existente.
 
 **Postcondiciones:** Los precios por condición están disponibles para mostrar en pantalla.
@@ -237,7 +240,7 @@ La pantalla `/card/[cardId]` requiere:
 
 - **Carga no bloqueante:** la metadata del catálogo (imagen, nombre, set) se muestra de forma inmediata desde SQLite local, sin esperar la respuesta de precios de JustTCG.
 - **Degradación offline:** la pantalla es totalmente funcional offline excepto la sección de precios por condición, que muestra el último precio NM conocido.
-- **Cache en sesión:** los precios por condición se cachean en TanStack Query con `staleTime = 5 minutos`. No se realiza una llamada a JustTCG en cada visita si el dato es reciente.
+- **Cache en sesión:** los precios por condición se cachean en TanStack Query con `staleTime` configurable vía la variable de entorno `PRICES_STALE_TIME_MS` (por defecto 1 hora). No se realiza una llamada a JustTCG en cada visita si el dato es reciente.
 - **Accesibilidad:** cada fila de precio y cada entrada de "Mis copias" deben tener un rol accesible y ser navegables por teclado en web.
 - Referencia a NFRs globales de MVP: rendimiento, soporte web/nativo y cobertura de tests definidos en `specs/MVP/mvp-spec.md` §4.
 
@@ -254,7 +257,7 @@ La pantalla `/card/[cardId]` requiere:
 | CA-05 | Si JustTCG no encuentra match para la carta, la sección de precios muestra "Precio no disponible" sin romper el resto de la pantalla. |
 | CA-06 | La sección "Mis copias" muestra todas las entradas de inventario de esa carta con colección, cantidad y condición. |
 | CA-07 | Pulsar una entrada en "Mis copias" navega al detalle de inventario (`/inventory/[inventoryId]`) de esa entrada. |
-| CA-08 | El botón "Agregar a colección" en el detalle de catálogo lleva al flujo de alta con la carta pre-seleccionada. |
+| CA-08 | El botón “Agregar a colección” en el detalle de catálogo abre un modal con la carta pre-seleccionada; al confirmar, el modal se cierra y la sección “Mis copias” se actualiza sin salir de la pantalla. |
 | CA-09 | El badge "En inventario" en el explorador de sets muestra la cantidad total de copias en todas las colecciones y no actúa como enlace directo al inventario. |
 | CA-10 | El precio NM obtenido en el detalle de catálogo queda reflejado en `price_cache`, manteniendo la coherencia de variación de precio en el inventario. |
 
@@ -268,14 +271,11 @@ La pantalla `/card/[cardId]` requiere:
 |---|---|---|
 | S-01 | JustTCG, al ser consultado sin filtro de condición (o con todas las condiciones), devuelve variants para las 5 condiciones del dominio cuando están disponibles. Verificado en el código: `client.v1.cards.get({ condition: ["NM","LP","MP","HP","DMG"] })` devuelve variants con campo `condition`. | Basado en la lectura del cliente `justtcg-client.ts` y el tipo `Card.variants`. Requiere validación empírica en implementación. |
 | S-02 | Los precios por condición NO se persisten en SQLite porque el `price_cache` actual está diseñado para un solo precio por carta. Extender el esquema por condición añadiría complejidad sin beneficio diferencial claro (los precios de catálogo se consultan bajo demanda, no se usan para calcular valor de colección). | Coherente con la arquitectura existente. Si en el futuro se necesita historial por condición, se añade una tabla `price_cache_by_condition`. |
-| S-03 | El acceso al detalle de catálogo desde el listado de cartas de una colección (`/collections/[collectionId]`) NO está incluido en esta feature. La lista de cartas de una colección navega al detalle de inventario. El detalle de catálogo es accesible desde el explorador de sets y desde el flujo de búsqueda/alta. | Separación clara de responsabilidades entre modelos de navegación. |
+| S-03 | El acceso al detalle de catálogo desde el listado de cartas de una colección (`/collections/[collectionId]`) NO está incluido en esta feature ni en ninguna posterior de forma implícita. La lista de cartas de una colección navega al detalle de inventario. El detalle de catálogo es accesible desde el explorador de sets y desde el flujo de búsqueda/alta. *(Decisión D-01 resuelta: No)* | El acceso cruzado añade complejidad de navegación sin beneficio diferencial confirmado. |
 | S-04 | El detalle de catálogo no incluye un botón de "Refrescar precio global" equivalente al existente en el detalle de inventario. El precio en catálogo se obtiene siempre en tiempo real al abrir la pantalla (sujeto a `staleTime`). | La pantalla de catálogo está orientada a consulta; la de inventario a gestión. |
-
+| S-05 | La condición del precio a destacar visualmente en la tabla de precios NO se cruza con las copias del usuario. Todas las condiciones se muestran con igual peso visual. *(Decisión D-03 resuelta: No)* | Simplifica la UI y evita lógica de cruce que no aporta valor confirmado. |
+| S-06 | El flujo de alta desde el detalle de catálogo se resuelve mediante un modal en pantalla, no navegando a `/add-card`. *(Decisión D-04 resuelta: Modal)* | Experiencia más fluida; el usuario permanece en el detalle al confirmar. |
+| S-07 | El `staleTime` de precios por condición se configura vía la variable de entorno `PRICES_STALE_TIME_MS`, con valor por defecto de 1 hora. *(Decisión D-02 resuelta)* | Permite ajustar la frecuencia de llamadas a JustTCG sin cambios de código. |
 ### Decisiones abiertas
 
-| ID | Pregunta | Impacto |
-|---|---|---|
-| D-01 | ¿Debe el detalle de catálogo ser accesible también desde el listado de cartas de una colección (como alternativa al detalle de inventario), permitiendo ver precio de mercado actualizado desde el contexto de gestión? | Si se acepta, requiere añadir un botón "Ver en catálogo" en el detalle de inventario o hacer las cards de colección navegables al catálogo. Cambio de UX relevante. |
-| D-02 | ¿El `staleTime` de 5 minutos para los precios por condición es el valor adecuado, o se prefiere un valor más largo (ej. 1 hora) para reducir llamadas a JustTCG? | Ajuste de parámetro; impacta en frecuencia de consultas a la API externa. |
-| D-03 | ¿Se debe mostrar el precio de la condición que coincide con la copia del usuario de forma destacada (ej. si tiene NM, remarcar el precio NM)? | UX del detalle; requiere cruzar datos de "Mis copias" con la tabla de precios. |
-| D-04 | ¿El flujo de alta desde el detalle de catálogo navega a la pantalla `add-card` con la carta pre-seleccionada, o se abre un modal ligero directamente en `/card/[cardId]`? | Decisión de UX e implementación. El modal es más fluido; la pantalla separada es más consistente con el flujo actual. |
+Todas las decisiones han sido resueltas. Ver supuestos S-03 (D-01), S-07 (D-02), S-05 (D-03) y S-06 (D-04).
