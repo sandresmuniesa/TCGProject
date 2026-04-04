@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 
 import { useQuery } from "@tanstack/react-query";
-import { useLocalSearchParams, useRouter } from "expo-router";
+import { useLocalSearchParams } from "expo-router";
 import { Image, Pressable, SafeAreaView, ScrollView, Text, TextInput, View } from "react-native";
 
 import { getCatalogExplorerSets, getCatalogSetCardsWithOwnership } from "@/services/catalog-explorer";
@@ -10,7 +10,6 @@ import { syncInitialSets } from "@/services/catalog-sync";
 
 export default function SetCardsExplorerScreen() {
   const params = useLocalSearchParams<{ setId?: string }>();
-  const router = useRouter();
   const [searchTerm, setSearchTerm] = useState("");
   const setId = params.setId;
 
@@ -166,18 +165,11 @@ export default function SetCardsExplorerScreen() {
                   </View>
 
                   {card.isOwned ? (
-                    <Pressable
-                      onPress={() => {
-                        if (card.inventoryId) {
-                          router.push(`/inventory/${card.inventoryId}`);
-                        }
-                      }}
-                      className="rounded-full bg-emerald-50 px-3 py-1"
-                    >
+                    <View className="rounded-full bg-emerald-50 px-3 py-1">
                       <Text className="text-xs font-semibold text-emerald-800">
                         En inventario · {card.ownedQuantity}
                       </Text>
-                    </Pressable>
+                    </View>
                   ) : (
                     <View className="rounded-full bg-slate-100 px-3 py-1">
                       <Text className="text-xs font-semibold text-slate-700">No la tienes</Text>

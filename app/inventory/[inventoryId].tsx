@@ -2,10 +2,11 @@ import { useEffect, useMemo, useState } from "react";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { Image, Pressable, SafeAreaView, ScrollView, Text, TextInput, View } from "react-native";
+import { Image, Modal, Pressable, SafeAreaView, ScrollView, Text, TextInput, View } from "react-native";
 
 import { CARD_CONDITIONS, type CardCondition } from "@/constants/card-condition";
-import { deleteInventoryCardEntry, getInventoryCardDetail, refreshInventoryCardPrice, updateInventoryCardEntry } from "@/services/inventory-detail";
+import { deleteInventoryCardEntry, getInventoryCardDetail, moveInventoryEntry, refreshInventoryCardPrice, updateInventoryCardEntry } from "@/services/inventory-detail";
+import { getCollectionsSummary } from "@/services/collection-management";
 import { useAppStore } from "@/store/app-store";
 
 const USD_FORMATTER = new Intl.NumberFormat("en-US", {
@@ -50,6 +51,16 @@ export default function InventoryCardDetailScreen() {
   const inventoryId = params.inventoryId;
   const [quantityInput, setQuantityInput] = useState("");
   const [condition, setCondition] = useState<CardCondition>("Near Mint");
+  const [isMoveModalOpen, setIsMoveModalOpen] = useState(false);
+  const [moveTargetId, setMoveTargetId] = useState<string | null>(null);
+  const [moveError, setMoveError] = useState<string | null>(null);
+
+  const collectionsQuery = useQuery({
+    queryKey: ["collections-summary"],
+    queryFn: () => getCollectionsSummary()
+  });
+
+  const collections = collectionsQuery.data ?? [];
 
   const detailQuery = useQuery({
     queryKey: ["inventory-card-detail", inventoryId],
@@ -107,7 +118,27 @@ export default function InventoryCardDetailScreen() {
     },
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["inventory-overview"] });
+      await queryClient.invalidateQueries({ queryKey: ["collections-summary"] });
       router.replace("/");
+    }
+  });
+
+  const moveMutation = useMutation({
+    mutationFn: async () => {
+      if (!inventoryId || !moveTargetId) {
+        throw new Error("No se pudo ejecutar el movimiento.");
+      }
+
+      await moveInventoryEntry(inventoryId, moveTargetId);
+    },
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["inventory-card-detail", inventoryId] });
+      await queryClient.invalidateQueries({ queryKey: ["inventory-overview"] });
+      await queryClient.invalidateQueries({ queryKey: ["collections-summary"] });
+      router.back();
+    },
+    onError: (e) => {
+      setMoveError(e instanceof Error ? e.message : "No se pudo mover la carta.");
     }
   });
 
@@ -273,9 +304,22 @@ export default function InventoryCardDetailScreen() {
               </View>
 
               <View className="mt-6 border-t border-slate-200 pt-4">
+                {collections.length >= 2 ? (
+                  <Pressable
+                    onPress={() => {
+                      setMoveTargetId(null);
+                      setMoveError(null);
+                      setIsMoveModalOpen(true);
+                    }}
+                    className="rounded-xl border border-slate-300 px-4 py-3"
+                  >
+                    <Text className="text-center text-sm font-semibold text-slate-700">Mover a coleccion</Text>
+                  </Pressable>
+                ) : null}
+
                 <Pressable
                   onPress={() => deleteMutation.mutate()}
-                  className="rounded-xl bg-red-600 px-4 py-3"
+                  className={`${collections.length >= 2 ? "mt-3" : ""} rounded-xl bg-red-600 px-4 py-3`}
                   disabled={deleteMutation.isPending}
                 >
                   <Text className="text-center text-sm font-semibold text-white">
@@ -290,6 +334,67 @@ export default function InventoryCardDetailScreen() {
         ) : null}
         </View>
       </ScrollView>
+
+      {/* Move to collection modal */}
+      <Modal
+        visible={isMoveModalOpen}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setIsMoveModalOpen(false)}
+      >
+        <View className="flex-1 items-center justify-center bg-black/50 px-6">
+          <View className="w-full max-w-sm rounded-2xl bg-white p-6">
+            <Text className="text-lg font-bold text-ink">Mover a coleccion</Text>
+            <Text className="mt-2 text-sm text-slate-700">
+              Selecciona la coleccion destino. Si ya existe una entrada con el mismo estado, las cantidades se sumaran.
+            </Text>
+            <ScrollView className="mt-3 max-h-56">
+              {collections
+                .filter((c) => c.collectionId !== detailQuery.data?.collectionId)
+                .map((c) => {
+                  const isSelected = moveTargetId === c.collectionId;
+
+                  return (
+                    <Pressable
+                      key={c.collectionId}
+                      onPress={() => setMoveTargetId(c.collectionId)}
+                      className={`mb-2 rounded-xl border px-3 py-3 ${
+                        isSelected ? "border-ink bg-ink" : "border-slate-300"
+                      }`}
+                    >
+                      <Text className={`text-sm font-semibold ${isSelected ? "text-mist" : "text-ink"}`}>
+                        {c.name}
+                      </Text>
+                      <Text className={`text-xs ${isSelected ? "text-slate-300" : "text-slate-500"}`}>
+                        {c.totalUniqueCardsCount} cartas unicas
+                      </Text>
+                    </Pressable>
+                  );
+                })}
+            </ScrollView>
+            {moveError ? <Text className="mt-2 text-sm text-red-700">{moveError}</Text> : null}
+            <View className="mt-4 flex-row gap-3">
+              <Pressable
+                onPress={() => setIsMoveModalOpen(false)}
+                className="flex-1 rounded-xl border border-slate-300 px-3 py-3"
+              >
+                <Text className="text-center text-sm font-semibold text-slate-700">Cancelar</Text>
+              </Pressable>
+              <Pressable
+                onPress={() => moveMutation.mutate()}
+                disabled={moveMutation.isPending || moveTargetId == null}
+                className={`flex-1 rounded-xl px-3 py-3 ${
+                  moveMutation.isPending || moveTargetId == null ? "bg-slate-300" : "bg-ink"
+                }`}
+              >
+                <Text className="text-center text-sm font-semibold text-mist">
+                  {moveMutation.isPending ? "Moviendo..." : "Mover"}
+                </Text>
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }

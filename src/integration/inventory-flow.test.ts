@@ -5,7 +5,7 @@ import { filterInventoryItems, getInventoryOverview, getInventorySetFilterOption
 
 const SETS_KEY = "tcg:catalog:sets:v1";
 const CARDS_KEY = "tcg:catalog:cards:set:v2:base1";
-const INVENTORY_KEY = "tcg:inventory:items:v1";
+const INVENTORY_KEY = "tcg:inventory:items:v2";
 const PRICE_CACHE_KEY_PREFIX = "tcg:price:card:";
 
 function seedCatalog() {
@@ -28,6 +28,7 @@ describe("Add card to inventory (offline flow)", () => {
   it("creates new inventory entry with null price when offline", async () => {
     const result = await addCardToInventory({
       cardId: "base1-4",
+      collectionId: "col-1",
       setId: "base1",
       number: "4",
       name: "Charizard",
@@ -51,6 +52,7 @@ describe("Add card to inventory (offline flow)", () => {
   it("merges quantity when adding the same card twice", async () => {
     await addCardToInventory({
       cardId: "base1-4",
+      collectionId: "col-1",
       setId: "base1",
       number: "4",
       name: "Charizard",
@@ -61,11 +63,12 @@ describe("Add card to inventory (offline flow)", () => {
 
     await addCardToInventory({
       cardId: "base1-4",
+      collectionId: "col-1",
       setId: "base1",
       number: "4",
       name: "Charizard",
       quantity: 3,
-      condition: "Lightly Played",
+      condition: "Near Mint",
       isOffline: true
     });
 
@@ -79,6 +82,7 @@ describe("Add card to inventory (offline flow)", () => {
   it("keeps different cards as separate inventory entries", async () => {
     await addCardToInventory({
       cardId: "base1-4",
+      collectionId: "col-1",
       setId: "base1",
       number: "4",
       name: "Charizard",
@@ -89,6 +93,7 @@ describe("Add card to inventory (offline flow)", () => {
 
     await addCardToInventory({
       cardId: "base1-1",
+      collectionId: "col-1",
       setId: "base1",
       number: "1",
       name: "Alakazam",
@@ -119,10 +124,11 @@ describe("Add card to inventory (online flow)", () => {
     let webRows: unknown[] = [];
 
     const result = await addCardToInventory(
-      { cardId: "base1-4", setId: "base1", number: "4", name: "Charizard", quantity: 1, condition: "Near Mint" },
+      { cardId: "base1-4", collectionId: "col-1", setId: "base1", number: "4", name: "Charizard", quantity: 1, condition: "Near Mint" },
       {
         platformOS: "web",
-        getInventoryItemByCardId: vi.fn().mockResolvedValue(null),
+        getInventoryItemByCardIdCollectionIdAndCondition: vi.fn().mockResolvedValue(null),
+        getPriceCacheByCardId: vi.fn().mockResolvedValue(null),
         saveInventoryItem: vi.fn(),
         syncCardPriceWithMatching,
         readWebInventoryRows: () => webRows as ReturnType<typeof Array.prototype.slice>,
@@ -152,8 +158,8 @@ describe("Inventory overview calculations", () => {
     localStorage.setItem(
       INVENTORY_KEY,
       JSON.stringify([
-        { id: "inv-1", cardId: "base1-4", quantity: 2, condition: "Near Mint", priceUsd: 10, addedAt: now },
-        { id: "inv-2", cardId: "base1-1", quantity: 1, condition: "Near Mint", priceUsd: 5, addedAt: now }
+        { id: "inv-1", cardId: "base1-4", collectionId: "col-1", quantity: 2, condition: "Near Mint", priceUsd: 10, addedAt: now },
+        { id: "inv-2", cardId: "base1-1", collectionId: "col-1", quantity: 1, condition: "Near Mint", priceUsd: 5, addedAt: now }
       ])
     );
 
@@ -168,8 +174,8 @@ describe("Inventory overview calculations", () => {
     localStorage.setItem(
       INVENTORY_KEY,
       JSON.stringify([
-        { id: "inv-1", cardId: "base1-4", quantity: 2, condition: "Near Mint", priceUsd: 10, addedAt: now },
-        { id: "inv-2", cardId: "base1-1", quantity: 1, condition: "Near Mint", priceUsd: null, addedAt: now }
+        { id: "inv-1", cardId: "base1-4", collectionId: "col-1", quantity: 2, condition: "Near Mint", priceUsd: 10, addedAt: now },
+        { id: "inv-2", cardId: "base1-1", collectionId: "col-1", quantity: 1, condition: "Near Mint", priceUsd: null, addedAt: now }
       ])
     );
 
@@ -194,8 +200,8 @@ describe("Inventory filter and set options", () => {
     localStorage.setItem(
       INVENTORY_KEY,
       JSON.stringify([
-        { id: "inv-1", cardId: "base1-4", quantity: 1, condition: "Near Mint", addedAt: now },
-        { id: "inv-2", cardId: "base1-1", quantity: 1, condition: "Near Mint", addedAt: now }
+        { id: "inv-1", cardId: "base1-4", collectionId: "col-1", quantity: 1, condition: "Near Mint", addedAt: now },
+        { id: "inv-2", cardId: "base1-1", collectionId: "col-1", quantity: 1, condition: "Near Mint", addedAt: now }
       ])
     );
 
@@ -212,8 +218,8 @@ describe("Inventory filter and set options", () => {
     localStorage.setItem(
       INVENTORY_KEY,
       JSON.stringify([
-        { id: "inv-1", cardId: "base1-4", quantity: 1, condition: "Near Mint", addedAt: now },
-        { id: "inv-2", cardId: "base1-1", quantity: 1, condition: "Near Mint", addedAt: now }
+        { id: "inv-1", cardId: "base1-4", collectionId: "col-1", quantity: 1, condition: "Near Mint", addedAt: now },
+        { id: "inv-2", cardId: "base1-1", collectionId: "col-1", quantity: 1, condition: "Near Mint", addedAt: now }
       ])
     );
 
@@ -229,7 +235,7 @@ describe("Inventory filter and set options", () => {
     localStorage.setItem(
       INVENTORY_KEY,
       JSON.stringify([
-        { id: "inv-1", cardId: "base1-4", quantity: 1, condition: "Near Mint", addedAt: now }
+        { id: "inv-1", cardId: "base1-4", collectionId: "col-1", quantity: 1, condition: "Near Mint", addedAt: now }
       ])
     );
 

@@ -19,7 +19,7 @@ export type CatalogSetCardsWithOwnershipParams = {
 export type CatalogCardWithOwnership = CatalogCardSearchResult & {
   isOwned: boolean;
   ownedQuantity: number;
-  inventoryId: string | null;
+  inventoryIds: string[];
 };
 
 type CatalogExplorerDeps = {
@@ -85,28 +85,29 @@ export async function getCatalogSetCardsWithOwnership(
     deps.getInventoryOverview()
   ]);
 
-  const inventoryByCardId = new Map<string, { quantity: number; inventoryId: string }>();
+  // Aggregate ownership across ALL collections for each card in this set.
+  const inventoryByCardId = new Map<string, { quantity: number; inventoryIds: string[] }>();
 
   for (const item of inventory.items) {
     if (item.setId !== params.setId) {
       continue;
     }
 
-    inventoryByCardId.set(item.cardId, {
-      quantity: item.quantity,
-      inventoryId: item.inventoryId
-    });
+    const current = inventoryByCardId.get(item.cardId) ?? { quantity: 0, inventoryIds: [] };
+    current.quantity += item.quantity;
+    current.inventoryIds.push(item.inventoryId);
+    inventoryByCardId.set(item.cardId, current);
   }
 
   return cards
     .map((card) => {
-      const inventoryItem = inventoryByCardId.get(card.id);
+      const ownership = inventoryByCardId.get(card.id);
 
       return {
         ...card,
-        isOwned: inventoryItem != null,
-        ownedQuantity: inventoryItem?.quantity ?? 0,
-        inventoryId: inventoryItem?.inventoryId ?? null
+        isOwned: ownership != null,
+        ownedQuantity: ownership?.quantity ?? 0,
+        inventoryIds: ownership?.inventoryIds ?? []
       };
     })
     .sort((a, b) => {

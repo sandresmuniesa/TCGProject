@@ -31,17 +31,12 @@ describe("refreshCardPriceWithVariation", () => {
         fetchedAt: new Date("2026-03-21T11:30:00.000Z")
       }
     });
-    const updateInventoryPriceSnapshotByCardId = vi.fn().mockResolvedValue(undefined);
 
     const result = await refreshCardPriceWithVariation(
       { cardId: "card-1" },
-      {
-        syncCardPrice,
-        updateInventoryPriceSnapshotByCardId
-      }
+      { syncCardPrice }
     );
 
-    expect(updateInventoryPriceSnapshotByCardId).toHaveBeenCalledWith("card-1", 15, expect.any(Date));
     expect(result.variationPercent).toBe(50);
     expect(result.source).toBe("remote");
   });
@@ -56,14 +51,10 @@ describe("refreshCardPriceWithVariation", () => {
         fetchedAt: new Date("2026-03-21T11:30:00.000Z")
       }
     });
-    const updateInventoryPriceSnapshotByCardId = vi.fn().mockResolvedValue(undefined);
 
     const result = await refreshCardPriceWithVariation(
       { cardId: "card-2" },
-      {
-        syncCardPrice,
-        updateInventoryPriceSnapshotByCardId
-      }
+      { syncCardPrice }
     );
 
     expect(result.variationPercent).toBeNull();

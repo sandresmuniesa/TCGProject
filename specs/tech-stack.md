@@ -92,20 +92,36 @@ Para fase 2, **Supabase** es la opción natural: se integra con React Native, of
 
 Justificación: El catálogo de tcgdex puede contener miles de cartas. La spec requiere filtrar por set, buscar por nombre y relacionar inventario con catálogo. Solo una base de datos relacional local resuelve esto eficientemente. Drizzle ORM añade tipado seguro y migraciones declarativas sin overhead.
 
-**Esquema inicial (tablas):**
+**Esquema de tablas (SQLite):**
 
 ```sql
 -- Catálogo cacheado de tcgdex
 sets  (id, name, logo_url, total_cards, fetched_at)
 cards (id, set_id, number, name, image_url, fetched_at)
 
+-- Colecciones del usuario
+collections (id, name, created_at)
+-- Invariante: existe siempre al menos una colección
+
 -- Inventario personal
-inventory (id, card_id, quantity, condition, price_usd, price_timestamp, added_at)
+inventory (id, card_id, collection_id, quantity, condition, price_usd, price_timestamp, added_at)
+-- UNIQUE(card_id, collection_id, condition)
 -- condition: 'Near Mint' | 'Lightly Played' | 'Moderately Played' | 'Heavily Played' | 'Damaged'
 
 -- Cache de precios de JustTCG (moneda: USD)
 price_cache (card_id, current_price_usd, previous_price_usd, fetched_at)
 ```
+
+**Esquema web (localStorage):**
+
+| Clave | Contenido |
+|---|---|
+| `tcg:collections:v1` | Array `{id, name, createdAt}` de colecciones del usuario |
+| `tcg:inventory:items:v2` | Array de entradas `{id, cardId, collectionId, quantity, condition, priceUsd, priceTimestamp, addedAt}` |
+| `tcg:catalog:sets:v1` | Array de sets sincronizados desde tcgdex |
+| `tcg:catalog:cards:set:v2:{setId}` | Array de cartas por set |
+| `tcg:price:card:{cardId}` | Precio en caché por carta (JustTCG) |
+| `tcg:inventory:items:v1` | Clave legacy pre-colecciones — se migra automáticamente en el primer arranque |
 
 ---
 

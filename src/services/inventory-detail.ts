@@ -3,20 +3,13 @@ import { Platform } from "react-native";
 import { CARD_CONDITIONS, type CardCondition } from "@/constants/card-condition";
 import { getInventoryOverview, type InventoryOverviewItem } from "@/services/inventory-query";
 import { refreshCardPriceWithVariation } from "@/services/price-variation";
+import { WEB_INVENTORY_ITEMS_V2_KEY, type WebInventoryRowV2 } from "@/services/web-storage";
 
-const WEB_INVENTORY_ITEMS_KEY = "tcg:inventory:items:v1";
+const WEB_INVENTORY_ITEMS_KEY = WEB_INVENTORY_ITEMS_V2_KEY;
 
 export type InventoryCardDetail = InventoryOverviewItem;
 
-type WebInventoryRow = {
-  id: string;
-  cardId: string;
-  quantity: number;
-  condition: InventoryOverviewItem["condition"];
-  priceUsd?: number | null;
-  priceTimestamp?: string | number | Date | null;
-  addedAt?: string | number | Date;
-};
+type WebInventoryRow = WebInventoryRowV2;
 
 type InventoryDetailDeps = {
   platformOS: string;
@@ -25,6 +18,7 @@ type InventoryDetailDeps = {
   saveNativeInventoryItem: (item: {
     id: string;
     cardId: string;
+    collectionId: string;
     quantity: number;
     condition: CardCondition;
     priceUsd: number | null;
@@ -32,6 +26,12 @@ type InventoryDetailDeps = {
     addedAt: Date;
   }) => Promise<void>;
   deleteNativeInventoryItem: (inventoryId: string) => Promise<void>;
+  updateNativeInventoryPriceSnapshot: (
+    inventoryId: string,
+    priceUsd: number,
+    priceTimestamp: Date
+  ) => Promise<void>;
+  moveNativeInventoryEntry: (inventoryId: string, targetCollectionId: string) => Promise<void>;
   readWebInventoryRows: () => WebInventoryRow[];
   writeWebInventoryRows: (rows: WebInventoryRow[]) => void;
 };
@@ -85,6 +85,37 @@ const defaultDeps: InventoryDetailDeps = {
     const { deleteInventoryItem } = await import("@/db/repositories/inventory-repository");
     await deleteInventoryItem(inventoryId);
   },
+  updateNativeInventoryPriceSnapshot: async (inventoryId, priceUsd, priceTimestamp) => {
+    const { updateInventoryPriceSnapshot } = await import("@/db/repositories/inventory-repository");
+    await updateInventoryPriceSnapshot(inventoryId, priceUsd, priceTimestamp);
+  },
+  moveNativeInventoryEntry: async (inventoryId, targetCollectionId) => {
+    const {
+      getInventoryItemById,
+      getInventoryItemByCardIdCollectionIdAndCondition,
+      saveInventoryItem,
+      deleteInventoryItem,
+      updateInventoryCollectionId
+    } = await import("@/db/repositories/inventory-repository");
+
+    const item = await getInventoryItemById(inventoryId);
+    if (!item) {
+      throw new Error("No se encontró la entrada de inventario.");
+    }
+
+    const collision = await getInventoryItemByCardIdCollectionIdAndCondition(
+      item.cardId,
+      targetCollectionId,
+      item.condition
+    );
+
+    if (collision) {
+      await saveInventoryItem({ ...collision, quantity: collision.quantity + item.quantity });
+      await deleteInventoryItem(inventoryId);
+    } else {
+      await updateInventoryCollectionId(inventoryId, targetCollectionId);
+    }
+  },
   readWebInventoryRows: () => readWebCacheArray<WebInventoryRow>(WEB_INVENTORY_ITEMS_KEY),
   writeWebInventoryRows: (rows) => writeWebCache(WEB_INVENTORY_ITEMS_KEY, rows)
 };
@@ -137,6 +168,24 @@ function deleteWebInventoryEntry(input: DeleteInventoryCardInput, deps: Inventor
   deps.writeWebInventoryRows(updatedRows);
 }
 
+function updateWebInventoryPriceSnapshot(
+  inventoryId: string,
+  priceUsd: number,
+  priceTimestamp: Date,
+  deps: InventoryDetailDeps
+) {
+  const rows = deps.readWebInventoryRows();
+  const updatedRows = rows.map((row) => {
+    if (row.id !== inventoryId) {
+      return row;
+    }
+
+    return { ...row, priceUsd, priceTimestamp };
+  });
+
+  deps.writeWebInventoryRows(updatedRows);
+}
+
 export async function getInventoryCardDetail(
   inventoryId: string,
   deps: InventoryDetailDeps = defaultDeps
@@ -149,23 +198,6 @@ export async function getInventoryCardDetail(
   }
 
   return detail;
-}
-
-function updateWebInventorySnapshot(cardId: string, priceUsd: number, priceTimestamp: Date, deps: InventoryDetailDeps) {
-  const rows = deps.readWebInventoryRows();
-  const updatedRows = rows.map((row) => {
-    if (row.cardId !== cardId) {
-      return row;
-    }
-
-    return {
-      ...row,
-      priceUsd,
-      priceTimestamp
-    };
-  });
-
-  deps.writeWebInventoryRows(updatedRows);
 }
 
 export async function refreshInventoryCardPrice(
@@ -184,10 +216,53 @@ export async function refreshInventoryCardPrice(
   });
 
   if (deps.platformOS === "web") {
-    updateWebInventorySnapshot(detail.cardId, refreshed.currentPriceUsd, refreshed.fetchedAt, deps);
+    updateWebInventoryPriceSnapshot(inventoryId, refreshed.currentPriceUsd, refreshed.fetchedAt, deps);
+  } else {
+    await deps.updateNativeInventoryPriceSnapshot(inventoryId, refreshed.currentPriceUsd, refreshed.fetchedAt);
   }
 
   return getInventoryCardDetail(inventoryId, deps);
+}
+
+export async function moveInventoryEntry(
+  inventoryId: string,
+  targetCollectionId: string,
+  deps: InventoryDetailDeps = defaultDeps
+): Promise<void> {
+  if (deps.platformOS === "web") {
+    const rows = deps.readWebInventoryRows();
+    const item = rows.find((r) => r.id === inventoryId);
+
+    if (!item) {
+      throw new Error("No se encontró la entrada de inventario.");
+    }
+
+    const collision = rows.find(
+      (r) =>
+        r.collectionId === targetCollectionId &&
+        r.cardId === item.cardId &&
+        r.condition === item.condition &&
+        r.id !== inventoryId
+    );
+
+    if (collision) {
+      const merged = rows.map((r) => {
+        if (r.id === collision.id) {
+          return { ...r, quantity: r.quantity + item.quantity };
+        }
+        return r;
+      });
+      deps.writeWebInventoryRows(merged.filter((r) => r.id !== inventoryId));
+    } else {
+      deps.writeWebInventoryRows(
+        rows.map((r) => (r.id === inventoryId ? { ...r, collectionId: targetCollectionId } : r))
+      );
+    }
+
+    return;
+  }
+
+  await deps.moveNativeInventoryEntry(inventoryId, targetCollectionId);
 }
 
 export async function updateInventoryCardEntry(
@@ -204,6 +279,7 @@ export async function updateInventoryCardEntry(
     await deps.saveNativeInventoryItem({
       id: detail.inventoryId,
       cardId: detail.cardId,
+      collectionId: detail.collectionId,
       quantity: input.quantity,
       condition: input.condition,
       priceUsd: detail.priceUsd,

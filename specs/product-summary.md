@@ -46,10 +46,11 @@ Hoy la gestion suele estar dispersa entre notas, hojas de calculo y webs de prec
 
 ### Inventario personal de cartas
 
-- Añadir cartas por nombre, set y numero.
+- Añadir cartas por nombre, set y numero, indicando la colección destino.
 - Guardar cantidad por carta.
 - Guardar estado de carta usando los estados habituales de TCG.
 - Sin cuentas de usuario en MVP (single user local).
+- La unicidad de una entrada está determinada por `(cardId, collectionId, condition)`: misma carta + misma condición + misma colección suma cantidad; distinta condición o distinta colección genera entradas independientes.
 
 ### Modelo minimo de carta en inventario
 
@@ -108,6 +109,15 @@ Nota: Los campos del dominio se alinearan con el proveedor de cartas para evitar
 - Consulta de precios en EUR.
 - Variacion de precio desde la ultima revision.
 
+### Fase 1.5 — Múltiples colecciones — Completada (abril 2026)
+
+- Múltiples colecciones independientes con CRUD completo (crear, renombrar, eliminar).
+- Pantalla principal rediseñada como listado de colecciones.
+- Mover cartas entre colecciones con merge automático ante colisiones.
+- Valor total independiente por colección.
+- Indicador de posesión global en el explorador de sets (suma de todas las colecciones).
+- Migración automática de inventario legacy a estructura multi-colección.
+
 ### Fase 2
 
 - Escaneo por camara.
@@ -131,3 +141,25 @@ Nota: Los campos del dominio se alinearan con el proveedor de cartas para evitar
 
 - **Completado** (abril 2026).
 - Todas las tareas del plan de implementacion (F1 a F4) finalizadas. Ver `MVP/development-tasks.md` para detalle.
+
+## Feature: Múltiples Colecciones
+
+Permite organizar el inventario en colecciones independientes. Cada colección tiene su propio listado de cartas, valor total y contexto de uso. La pantalla principal muestra el listado de colecciones como punto de entrada en lugar de un listado plano de cartas.
+
+### Funcionalidades
+
+- Crear, renombrar y eliminar colecciones con nombre libre (máx. 50 caracteres, sin duplicados).
+- La app garantiza que siempre existe al menos una colección.
+- Pantalla de listado de colecciones como pantalla raíz (`app/index.tsx`).
+- Pantalla de cartas por colección (`app/collections/[collectionId].tsx`).
+- Agregar cartas a una colección; la más antigua queda pre-seleccionada si no hay contexto.
+- Mover entradas de inventario entre colecciones con merge automático ante colisiones.
+- Valor total calculado por colección de forma independiente.
+- La misma carta puede existir en distintas colecciones como entradas completamente independientes.
+- Indicador global de posesión en el explorador de sets (suma de todas las colecciones).
+- Migración automática de datos legacy (`tcg:inventory:items:v1` → `v2`) en el primer arranque.
+
+## Estado — Feature: Múltiples Colecciones
+
+- **Completada** (abril 2026).
+- Todas las tareas del plan de implementación (F1 a F4) finalizadas. Ver `multi-collections/development-tasks.md` para detalle.

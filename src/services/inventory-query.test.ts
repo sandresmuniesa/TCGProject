@@ -11,6 +11,8 @@ const SAMPLE_ITEMS: InventoryOverviewItem[] = [
   {
     inventoryId: "inv-1",
     cardId: "card-1",
+    collectionId: "col-1",
+    collectionName: "Mi colección",
     name: "Charizard",
     setId: "base1",
     setName: "Base Set",
@@ -27,6 +29,8 @@ const SAMPLE_ITEMS: InventoryOverviewItem[] = [
   {
     inventoryId: "inv-2",
     cardId: "card-2",
+    collectionId: "col-1",
+    collectionName: "Mi colección",
     name: "Bulbasaur",
     setId: "base1",
     setName: "Base Set",
@@ -43,6 +47,8 @@ const SAMPLE_ITEMS: InventoryOverviewItem[] = [
   {
     inventoryId: "inv-3",
     cardId: "card-3",
+    collectionId: "col-1",
+    collectionName: "Mi colección",
     name: "Lugia",
     setId: "neo1",
     setName: "Neo Genesis",
@@ -60,12 +66,14 @@ const SAMPLE_ITEMS: InventoryOverviewItem[] = [
 
 describe("getInventoryOverview", () => {
   it("builds overview from native joined rows", async () => {
-    const result = await getInventoryOverview({
+    const result = await getInventoryOverview(null, {
       platformOS: "android",
       getNativeInventoryDetails: vi.fn().mockResolvedValue([
         {
           inventoryId: "inv-1",
           cardId: "card-1",
+          collectionId: "col-1",
+          collectionName: "Mi colección",
           quantity: 2,
           condition: "Near Mint",
           priceUsd: 10,
@@ -80,6 +88,7 @@ describe("getInventoryOverview", () => {
         }
       ]),
       readWebInventoryRows: vi.fn(),
+      readWebCollections: vi.fn(),
       readWebSets: vi.fn(),
       readWebCardsBySetId: vi.fn(),
       readWebPriceCacheByCardId: vi.fn()
@@ -92,12 +101,14 @@ describe("getInventoryOverview", () => {
   });
 
   it("normalizes native string price values", async () => {
-    const result = await getInventoryOverview({
+    const result = await getInventoryOverview(null, {
       platformOS: "android",
       getNativeInventoryDetails: vi.fn().mockResolvedValue([
         {
           inventoryId: "inv-1",
           cardId: "card-1",
+          collectionId: "col-1",
+          collectionName: "Mi colección",
           quantity: 2,
           condition: "Near Mint",
           priceUsd: "10.5",
@@ -112,6 +123,7 @@ describe("getInventoryOverview", () => {
         }
       ]),
       readWebInventoryRows: vi.fn(),
+      readWebCollections: vi.fn(),
       readWebSets: vi.fn(),
       readWebCardsBySetId: vi.fn(),
       readWebPriceCacheByCardId: vi.fn()
@@ -123,13 +135,14 @@ describe("getInventoryOverview", () => {
   });
 
   it("builds overview from web cache and sorts by newest first", async () => {
-    const result = await getInventoryOverview({
+    const result = await getInventoryOverview(null, {
       platformOS: "web",
       getNativeInventoryDetails: vi.fn(),
       readWebInventoryRows: vi.fn().mockReturnValue([
         {
           id: "inv-1",
           cardId: "card-1",
+          collectionId: "col-1",
           quantity: 1,
           condition: "Near Mint",
           priceUsd: 15,
@@ -138,12 +151,14 @@ describe("getInventoryOverview", () => {
         {
           id: "inv-2",
           cardId: "card-2",
+          collectionId: "col-1",
           quantity: 3,
           condition: "Lightly Played",
           priceUsd: 5,
           addedAt: "2026-03-21T11:00:00.000Z"
         }
       ]),
+      readWebCollections: vi.fn().mockReturnValue([{ id: "col-1", name: "Mi collección", createdAt: 0 }]),
       readWebSets: vi.fn().mockReturnValue([
         { id: "base1", name: "Base Set" },
         { id: "neo1", name: "Neo Genesis" }
@@ -192,10 +207,11 @@ describe("getInventoryOverview", () => {
   });
 
   it("returns empty overview when web inventory has no rows", async () => {
-    const result = await getInventoryOverview({
+    const result = await getInventoryOverview(null, {
       platformOS: "web",
       getNativeInventoryDetails: vi.fn(),
       readWebInventoryRows: vi.fn().mockReturnValue([]),
+      readWebCollections: vi.fn().mockReturnValue([]),
       readWebSets: vi.fn(),
       readWebCardsBySetId: vi.fn(),
       readWebPriceCacheByCardId: vi.fn()

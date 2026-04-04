@@ -3,11 +3,14 @@ import { Platform } from "react-native";
 import type { CardCondition } from "@/constants/card-condition";
 import { syncCardPriceWithMatching } from "@/services/price-matching";
 
-const WEB_INVENTORY_ITEMS_KEY = "tcg:inventory:items:v1";
+import { WEB_INVENTORY_ITEMS_V2_KEY, type WebInventoryRowV2 } from "@/services/web-storage";
+
+const WEB_INVENTORY_ITEMS_KEY = WEB_INVENTORY_ITEMS_V2_KEY;
 const WEB_PRICE_CACHE_KEY_PREFIX = "tcg:price:card:";
 
 type AddCardInput = {
   cardId: string;
+  collectionId: string;
   setId: string;
   setName?: string;
   number: string;
@@ -28,6 +31,7 @@ export type AddCardToInventoryResult = {
 type InventoryRowShape = {
   id: string;
   cardId: string;
+  collectionId: string;
   quantity: number;
   condition: CardCondition;
   priceUsd: number | null;
@@ -35,19 +39,15 @@ type InventoryRowShape = {
   addedAt: Date;
 };
 
-type WebInventoryRow = {
-  id: string;
-  cardId: string;
-  quantity: number;
-  condition: CardCondition;
-  priceUsd?: number | null;
-  priceTimestamp?: string | number | Date | null;
-  addedAt?: string | number | Date;
-};
+type WebInventoryRow = WebInventoryRowV2;
 
 type AddCardDeps = {
   platformOS: string;
-  getInventoryItemByCardId: (cardId: string) => Promise<InventoryRowShape | null>;
+  getInventoryItemByCardIdCollectionIdAndCondition: (
+    cardId: string,
+    collectionId: string,
+    condition: string
+  ) => Promise<InventoryRowShape | null>;
   getPriceCacheByCardId: (cardId: string) => Promise<{ currentPriceUsd: number | string | null; fetchedAt: Date | null } | null>;
   saveInventoryItem: (item: InventoryRowShape) => Promise<void>;
   syncCardPriceWithMatching: typeof syncCardPriceWithMatching;
@@ -193,13 +193,18 @@ async function resolvePriceSnapshot(input: AddCardInput, deps: AddCardDeps): Pro
 }
 
 async function runNativeAdd(input: AddCardInput, deps: AddCardDeps): Promise<AddCardToInventoryResult> {
-  const existing = await deps.getInventoryItemByCardId(input.cardId);
+  const existing = await deps.getInventoryItemByCardIdCollectionIdAndCondition(
+    input.cardId,
+    input.collectionId,
+    input.condition
+  );
   const priceSnapshot = await resolvePriceSnapshot(input, deps);
 
   const mergedQuantity = (existing?.quantity ?? 0) + input.quantity;
   const savedItem: InventoryRowShape = {
     id: existing?.id ?? createInventoryId(),
     cardId: input.cardId,
+    collectionId: input.collectionId,
     quantity: mergedQuantity,
     condition: input.condition,
     priceUsd: priceSnapshot.priceUsd ?? existing?.priceUsd ?? null,
@@ -220,7 +225,13 @@ async function runNativeAdd(input: AddCardInput, deps: AddCardDeps): Promise<Add
 
 async function runWebAdd(input: AddCardInput, deps: AddCardDeps): Promise<AddCardToInventoryResult> {
   const rows = deps.readWebInventoryRows();
-  const existing = rows.find((row) => row.cardId === input.cardId) ?? null;
+  const existing =
+    rows.find(
+      (row) =>
+        row.cardId === input.cardId &&
+        row.collectionId === input.collectionId &&
+        row.condition === input.condition
+    ) ?? null;
   const priceSnapshot = await resolvePriceSnapshot(input, deps);
   const mergedQuantity = (existing?.quantity ?? 0) + input.quantity;
   const now = new Date();
@@ -228,6 +239,7 @@ async function runWebAdd(input: AddCardInput, deps: AddCardDeps): Promise<AddCar
   const updatedRow: WebInventoryRow = {
     id: existing?.id ?? createInventoryId(),
     cardId: input.cardId,
+    collectionId: input.collectionId,
     quantity: mergedQuantity,
     condition: input.condition,
     priceUsd: priceSnapshot.priceUsd ?? existing?.priceUsd ?? null,
@@ -235,7 +247,7 @@ async function runWebAdd(input: AddCardInput, deps: AddCardDeps): Promise<AddCar
     addedAt: existing?.addedAt ?? now
   };
 
-  const filtered = rows.filter((row) => row.cardId !== input.cardId);
+  const filtered = rows.filter((row) => row.id !== updatedRow.id);
   deps.writeWebInventoryRows([updatedRow, ...filtered]);
 
   return {
@@ -249,9 +261,11 @@ async function runWebAdd(input: AddCardInput, deps: AddCardDeps): Promise<AddCar
 
 const defaultDeps: AddCardDeps = {
   platformOS: Platform.OS,
-  getInventoryItemByCardId: async (cardId) => {
-    const { getInventoryItemByCardId } = await import("@/db/repositories/inventory-repository");
-    return getInventoryItemByCardId(cardId);
+  getInventoryItemByCardIdCollectionIdAndCondition: async (cardId, collectionId, condition) => {
+    const { getInventoryItemByCardIdCollectionIdAndCondition } = await import(
+      "@/db/repositories/inventory-repository"
+    );
+    return getInventoryItemByCardIdCollectionIdAndCondition(cardId, collectionId, condition) as Promise<InventoryRowShape | null>;
   },
   getPriceCacheByCardId: async (cardId) => {
     if (Platform.OS === "web") {

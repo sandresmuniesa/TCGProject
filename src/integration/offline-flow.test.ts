@@ -6,7 +6,7 @@ import { getInventoryCardDetail, refreshInventoryCardPrice } from "@/services/in
 
 const SETS_KEY = "tcg:catalog:sets:v1";
 const CARDS_KEY = "tcg:catalog:cards:set:v2:base1";
-const INVENTORY_KEY = "tcg:inventory:items:v1";
+const INVENTORY_KEY = "tcg:inventory:items:v2";
 
 function seedCatalog() {
   localStorage.setItem(SETS_KEY, JSON.stringify([{ id: "base1", name: "Base Set" }]));
@@ -26,10 +26,11 @@ describe("Offline add card: price is not fetched", () => {
     const syncCardPriceWithMatching = vi.fn();
 
     await addCardToInventory(
-      { cardId: "base1-4", setId: "base1", number: "4", name: "Charizard", quantity: 1, condition: "Near Mint", isOffline: true },
+      { cardId: "base1-4", collectionId: "col-1", setId: "base1", number: "4", name: "Charizard", quantity: 1, condition: "Near Mint", isOffline: true },
       {
         platformOS: "web",
-        getInventoryItemByCardId: vi.fn().mockResolvedValue(null),
+        getInventoryItemByCardIdCollectionIdAndCondition: vi.fn().mockResolvedValue(null),
+        getPriceCacheByCardId: vi.fn().mockResolvedValue(null),
         saveInventoryItem: vi.fn(),
         syncCardPriceWithMatching,
         readWebInventoryRows: () => [],
@@ -54,7 +55,7 @@ describe("Offline read: inventory and catalog readable without network", () => {
     localStorage.setItem(
       INVENTORY_KEY,
       JSON.stringify([
-        { id: "inv-1", cardId: "base1-4", quantity: 3, condition: "Near Mint", priceUsd: 20, addedAt: now }
+        { id: "inv-1", cardId: "base1-4", collectionId: "col-1", quantity: 3, condition: "Near Mint", priceUsd: 20, addedAt: now }
       ])
     );
 
@@ -75,7 +76,7 @@ describe("Offline read: inventory and catalog readable without network", () => {
     const now = new Date().toISOString();
     localStorage.setItem(
       INVENTORY_KEY,
-      JSON.stringify([{ id: "inv-1", cardId: "base1-4", quantity: 2, condition: "Near Mint", addedAt: now }])
+      JSON.stringify([{ id: "inv-1", cardId: "base1-4", collectionId: "col-1", quantity: 2, condition: "Near Mint", addedAt: now }])
     );
 
     const mockFetch = vi.fn();
@@ -96,7 +97,7 @@ describe("Price refresh flow", () => {
     const now = new Date().toISOString();
     localStorage.setItem(
       INVENTORY_KEY,
-      JSON.stringify([{ id: "inv-1", cardId: "base1-4", quantity: 1, condition: "Near Mint", priceUsd: 10, addedAt: now }])
+      JSON.stringify([{ id: "inv-1", cardId: "base1-4", collectionId: "col-1", quantity: 1, condition: "Near Mint", priceUsd: 10, addedAt: now }])
     );
 
     const mockRefreshCardPriceWithVariation = vi.fn().mockResolvedValue({
@@ -114,6 +115,8 @@ describe("Price refresh flow", () => {
       refreshCardPriceWithVariation: mockRefreshCardPriceWithVariation,
       saveNativeInventoryItem: vi.fn(),
       deleteNativeInventoryItem: vi.fn(),
+      updateNativeInventoryPriceSnapshot: vi.fn(),
+      moveNativeInventoryEntry: vi.fn(),
       readWebInventoryRows: () => {
         const raw = localStorage.getItem(INVENTORY_KEY);
         return raw ? JSON.parse(raw) : [];
@@ -132,7 +135,7 @@ describe("Price refresh flow", () => {
     const now = new Date().toISOString();
     localStorage.setItem(
       INVENTORY_KEY,
-      JSON.stringify([{ id: "inv-1", cardId: "base1-4", quantity: 1, condition: "Near Mint", priceUsd: 8, addedAt: now }])
+      JSON.stringify([{ id: "inv-1", cardId: "base1-4", collectionId: "col-1", quantity: 1, condition: "Near Mint", priceUsd: 8, addedAt: now }])
     );
 
     const mockRefreshCardPriceWithVariation = vi.fn().mockResolvedValue({
@@ -150,6 +153,8 @@ describe("Price refresh flow", () => {
       refreshCardPriceWithVariation: mockRefreshCardPriceWithVariation,
       saveNativeInventoryItem: vi.fn(),
       deleteNativeInventoryItem: vi.fn(),
+      updateNativeInventoryPriceSnapshot: vi.fn(),
+      moveNativeInventoryEntry: vi.fn(),
       readWebInventoryRows: () => {
         const raw = localStorage.getItem(INVENTORY_KEY);
         return raw ? JSON.parse(raw) : [];

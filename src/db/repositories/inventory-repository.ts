@@ -1,7 +1,7 @@
-import { desc, eq } from "drizzle-orm";
+import { and, desc, eq } from "drizzle-orm";
 
 import { getDb } from "@/db/client";
-import { cardsTable, inventoryTable, priceCacheTable, setsTable, type InventoryRow } from "@/db/schema";
+import { cardsTable, collectionsTable, inventoryTable, priceCacheTable, setsTable, type InventoryRow } from "@/db/schema";
 
 export async function getInventoryItems() {
   const db = getDb();
@@ -15,6 +15,8 @@ export async function getInventoryItemDetails() {
     .select({
       inventoryId: inventoryTable.id,
       cardId: inventoryTable.cardId,
+      collectionId: inventoryTable.collectionId,
+      collectionName: collectionsTable.name,
       quantity: inventoryTable.quantity,
       condition: inventoryTable.condition,
       priceUsd: inventoryTable.priceUsd,
@@ -31,13 +33,43 @@ export async function getInventoryItemDetails() {
     .leftJoin(cardsTable, eq(inventoryTable.cardId, cardsTable.id))
     .leftJoin(setsTable, eq(cardsTable.setId, setsTable.id))
     .leftJoin(priceCacheTable, eq(inventoryTable.cardId, priceCacheTable.cardId))
+    .leftJoin(collectionsTable, eq(inventoryTable.collectionId, collectionsTable.id))
     .orderBy(desc(inventoryTable.addedAt));
 }
 
-export async function getInventoryItemByCardId(cardId: string) {
+export async function getInventoryItemByCardId(cardId: string, collectionId: string) {
   const db = getDb();
-  const rows = await db.select().from(inventoryTable).where(eq(inventoryTable.cardId, cardId)).limit(1);
+  const rows = await db
+    .select()
+    .from(inventoryTable)
+    .where(and(eq(inventoryTable.cardId, cardId), eq(inventoryTable.collectionId, collectionId)))
+    .limit(1);
   return rows[0] ?? null;
+}
+
+export async function getInventoryItemByCardIdCollectionIdAndCondition(
+  cardId: string,
+  collectionId: string,
+  condition: string
+) {
+  const db = getDb();
+  const rows = await db
+    .select()
+    .from(inventoryTable)
+    .where(
+      and(
+        eq(inventoryTable.cardId, cardId),
+        eq(inventoryTable.collectionId, collectionId),
+        eq(inventoryTable.condition, condition as InventoryRow["condition"])
+      )
+    )
+    .limit(1);
+  return rows[0] ?? null;
+}
+
+export async function getInventoryItemsByCollectionId(collectionId: string): Promise<InventoryRow[]> {
+  const db = getDb();
+  return db.select().from(inventoryTable).where(eq(inventoryTable.collectionId, collectionId));
 }
 
 export async function saveInventoryItem(item: InventoryRow) {
@@ -58,13 +90,86 @@ export async function deleteInventoryItem(id: string) {
   await db.delete(inventoryTable).where(eq(inventoryTable.id, id));
 }
 
-export async function updateInventoryPriceSnapshotByCardId(cardId: string, priceUsd: number, priceTimestamp = new Date()) {
+/**
+ * Updates the price snapshot for a specific inventory entry by its inventoryId.
+ * Replaces the previous updateInventoryPriceSnapshotByCardId (which updated all
+ * entries sharing the same cardId, ignoring collection boundaries).
+ */
+export async function updateInventoryPriceSnapshot(
+  inventoryId: string,
+  priceUsd: number,
+  priceTimestamp = new Date()
+) {
   const db = getDb();
   await db
     .update(inventoryTable)
-    .set({
-      priceUsd,
-      priceTimestamp
-    })
-    .where(eq(inventoryTable.cardId, cardId));
+    .set({ priceUsd, priceTimestamp })
+    .where(eq(inventoryTable.id, inventoryId));
+}
+
+/**
+ * Moves all inventory entries from `fromCollectionId` to `toCollectionId`.
+ * When an entry would collide on UNIQUE(card_id, collection_id, condition), the
+ * quantities are merged into the target entry and the source entry is deleted.
+ */
+export async function reassignInventoryItems(
+  fromCollectionId: string,
+  toCollectionId: string
+): Promise<void> {
+  const db = getDb();
+
+  const fromItems = await db
+    .select()
+    .from(inventoryTable)
+    .where(eq(inventoryTable.collectionId, fromCollectionId));
+
+  if (fromItems.length === 0) {
+    return;
+  }
+
+  const toItems = await db
+    .select()
+    .from(inventoryTable)
+    .where(eq(inventoryTable.collectionId, toCollectionId));
+
+  const toItemIndex = new Map(
+    toItems.map((item) => [`${item.cardId}::${item.condition}`, item])
+  );
+
+  for (const fromItem of fromItems) {
+    const collisionKey = `${fromItem.cardId}::${fromItem.condition}`;
+    const toItem = toItemIndex.get(collisionKey);
+
+    if (toItem) {
+      // Merge: sum quantities into the target entry, then delete the source entry.
+      await db
+        .update(inventoryTable)
+        .set({ quantity: toItem.quantity + fromItem.quantity })
+        .where(eq(inventoryTable.id, toItem.id));
+      await db.delete(inventoryTable).where(eq(inventoryTable.id, fromItem.id));
+    } else {
+      // No collision: simply reassign the entry to the target collection.
+      await db
+        .update(inventoryTable)
+        .set({ collectionId: toCollectionId })
+        .where(eq(inventoryTable.id, fromItem.id));
+      // Update the index so subsequent iterations see this entry as "in target".
+      toItemIndex.set(collisionKey, { ...fromItem, collectionId: toCollectionId });
+    }
+  }
+}
+
+export async function getInventoryItemById(id: string): Promise<InventoryRow | null> {
+  const db = getDb();
+  const rows = await db.select().from(inventoryTable).where(eq(inventoryTable.id, id)).limit(1);
+  return rows[0] ?? null;
+}
+
+/**
+ * Updates only the collectionId of an existing inventory entry.
+ * Used when moving a single entry between collections without changing other fields.
+ */
+export async function updateInventoryCollectionId(inventoryId: string, collectionId: string): Promise<void> {
+  const db = getDb();
+  await db.update(inventoryTable).set({ collectionId }).where(eq(inventoryTable.id, inventoryId));
 }

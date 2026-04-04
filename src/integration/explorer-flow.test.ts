@@ -4,7 +4,7 @@ import { filterCatalogExplorerSets, getCatalogExplorerSets, getCatalogSetCardsWi
 
 const SETS_KEY = "tcg:catalog:sets:v1";
 const CARDS_KEY_PREFIX = "tcg:catalog:cards:set:v2:";
-const INVENTORY_KEY = "tcg:inventory:items:v1";
+const INVENTORY_KEY = "tcg:inventory:items:v2";
 
 function seedSets() {
   localStorage.setItem(
@@ -38,6 +38,7 @@ function seedInventory(items: { id: string; cardId: string; quantity: number }[]
     JSON.stringify(
       items.map((item) => ({
         ...item,
+        collectionId: "col-1",
         condition: "Near Mint",
         priceUsd: null,
         addedAt: now
@@ -112,7 +113,7 @@ describe("getCatalogSetCardsWithOwnership", () => {
     cards.forEach((card) => {
       expect(card.isOwned).toBe(false);
       expect(card.ownedQuantity).toBe(0);
-      expect(card.inventoryId).toBeNull();
+      expect(card.inventoryIds).toEqual([]);
     });
   });
 
@@ -125,10 +126,10 @@ describe("getCatalogSetCardsWithOwnership", () => {
 
     expect(charizard?.isOwned).toBe(true);
     expect(charizard?.ownedQuantity).toBe(2);
-    expect(charizard?.inventoryId).toBe("inv-4");
+    expect(charizard?.inventoryIds).toEqual(["inv-4"]);
 
     expect(alakazam?.isOwned).toBe(false);
-    expect(alakazam?.inventoryId).toBeNull();
+    expect(alakazam?.inventoryIds).toEqual([]);
   });
 
   it("returns cards sorted by card number numerically", async () => {

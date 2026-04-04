@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useRouter } from "expo-router";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import { Image, Pressable, SafeAreaView, ScrollView, Text, TextInput, View } from "react-native";
 
 import { CARD_CONDITIONS, type CardCondition } from "@/constants/card-condition";
@@ -12,12 +12,14 @@ import { getCatalogSetOptions } from "@/services/catalog-sets-query";
 import { PAGE_SIZE_OPTIONS, paginateResults, type PageSizeOption } from "@/services/pagination";
 import { syncInitialSets } from "@/services/catalog-sync";
 import { addCardToInventory } from "@/services/inventory-upsert";
+import { getCollectionsSummary } from "@/services/collection-management";
 import type { CatalogCardSearchResult } from "@/services/catalog-query";
 import { useAppStore } from "@/store/app-store";
 
 export default function AddCardScreen() {
   const router = useRouter();
   const queryClient = useQueryClient();
+  const params = useLocalSearchParams<{ collectionId?: string }>();
   const isOffline = useAppStore((state) => state.isOffline);
   const setSelectedCardId = useAppStore((state) => state.setSelectedCardId);
   const setSelectedSetId = useAppStore((state) => state.setSelectedSetId);
@@ -31,7 +33,27 @@ export default function AddCardScreen() {
   const [quantityInput, setQuantityInput] = useState("1");
   const [condition, setCondition] = useState<CardCondition>("Near Mint");
   const [formError, setFormError] = useState<string | null>(null);
+  const [selectedCollectionId, setSelectedCollectionId] = useState<string | null>(null);
   const scrollViewRef = useRef<ScrollView>(null);
+
+  const collectionsQuery = useQuery({
+    queryKey: ["collections-summary"],
+    queryFn: () => getCollectionsSummary()
+  });
+
+  const collections = collectionsQuery.data ?? [];
+
+  useEffect(() => {
+    if (collections.length === 0) {
+      return;
+    }
+
+    if (params.collectionId) {
+      setSelectedCollectionId(params.collectionId);
+    } else if (selectedCollectionId == null) {
+      setSelectedCollectionId(collections[0].collectionId);
+    }
+  }, [collections, params.collectionId]);
 
   const setsSyncQuery = useQuery({
     queryKey: ["add-card-initial-sets-sync"],
@@ -93,6 +115,7 @@ export default function AddCardScreen() {
         name: selectedCard.name,
         quantity,
         condition,
+        collectionId: selectedCollectionId ?? "",
         isOffline
       });
     },
@@ -100,6 +123,7 @@ export default function AddCardScreen() {
       setSelectedCardId(result.cardId);
       setSelectedSetId(selectedCard?.setId ?? null);
       await queryClient.invalidateQueries({ queryKey: ["inventory-overview"] });
+      await queryClient.invalidateQueries({ queryKey: ["collections-summary"] });
       router.back();
     }
   });
@@ -336,6 +360,40 @@ export default function AddCardScreen() {
                 <Text className="mt-1 text-sm text-slate-700">
                   Set: {setNameById.get(selectedCard.setId) ?? "Set desconocido"} · Numero: {selectedCard.number}
                 </Text>
+
+                {collections.length > 1 ? (
+                  <>
+                    <Text className="mt-4 text-sm font-semibold text-ink">Coleccion destino</Text>
+                    <ScrollView
+                      horizontal
+                      showsHorizontalScrollIndicator={false}
+                      className="mt-2"
+                      contentContainerStyle={{ gap: 8 }}
+                    >
+                      {collections.map((col) => {
+                        const isActive = selectedCollectionId === col.collectionId;
+
+                        return (
+                          <Pressable
+                            key={col.collectionId}
+                            onPress={() => setSelectedCollectionId(col.collectionId)}
+                            className={`rounded-full px-3 py-2 ${
+                              isActive ? "bg-ink" : "bg-slate-100"
+                            }`}
+                          >
+                            <Text
+                              className={`text-xs font-semibold ${
+                                isActive ? "text-mist" : "text-slate-700"
+                              }`}
+                            >
+                              {col.name}
+                            </Text>
+                          </Pressable>
+                        );
+                      })}
+                    </ScrollView>
+                  </>
+                ) : null}
 
                 <Text className="mt-4 text-sm font-semibold text-ink">Cantidad</Text>
                 <TextInput

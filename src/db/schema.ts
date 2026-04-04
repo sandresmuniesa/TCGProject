@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { integer, real, sqliteTable, text } from "drizzle-orm/sqlite-core";
+import { integer, real, sqliteTable, text, unique } from "drizzle-orm/sqlite-core";
 
 import { CARD_CONDITIONS } from "@/constants/card-condition";
 
@@ -22,19 +22,38 @@ export const cardsTable = sqliteTable("cards", {
   fetchedAt: integer("fetched_at", { mode: "timestamp_ms" }).notNull()
 });
 
-export const inventoryTable = sqliteTable("inventory", {
+export const collectionsTable = sqliteTable("collections", {
   id: text("id").primaryKey(),
-  cardId: text("card_id")
-    .notNull()
-    .references(() => cardsTable.id, { onDelete: "cascade" }),
-  quantity: integer("quantity").notNull().default(1),
-  condition: text("condition", { enum: CARD_CONDITIONS }).notNull(),
-  priceUsd: real("price_usd"),
-  priceTimestamp: integer("price_timestamp", { mode: "timestamp_ms" }),
-  addedAt: integer("added_at", { mode: "timestamp_ms" })
-    .notNull()
-    .default(sql`(unixepoch('subsec') * 1000)`)
+  name: text("name").notNull(),
+  createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull()
 });
+
+export const inventoryTable = sqliteTable(
+  "inventory",
+  {
+    id: text("id").primaryKey(),
+    cardId: text("card_id")
+      .notNull()
+      .references(() => cardsTable.id, { onDelete: "cascade" }),
+    collectionId: text("collection_id")
+      .notNull()
+      .references(() => collectionsTable.id, { onDelete: "restrict" }),
+    quantity: integer("quantity").notNull().default(1),
+    condition: text("condition", { enum: CARD_CONDITIONS }).notNull(),
+    priceUsd: real("price_usd"),
+    priceTimestamp: integer("price_timestamp", { mode: "timestamp_ms" }),
+    addedAt: integer("added_at", { mode: "timestamp_ms" })
+      .notNull()
+      .default(sql`(unixepoch('subsec') * 1000)`)
+  },
+  (table) => [
+    unique("inventory_card_collection_condition_uniq").on(
+      table.cardId,
+      table.collectionId,
+      table.condition
+    )
+  ]
+);
 
 export const priceCacheTable = sqliteTable("price_cache", {
   cardId: text("card_id")
@@ -47,5 +66,6 @@ export const priceCacheTable = sqliteTable("price_cache", {
 
 export type SetRow = typeof setsTable.$inferSelect;
 export type CardRow = typeof cardsTable.$inferSelect;
+export type CollectionRow = typeof collectionsTable.$inferSelect;
 export type InventoryRow = typeof inventoryTable.$inferSelect;
 export type PriceCacheRow = typeof priceCacheTable.$inferSelect;

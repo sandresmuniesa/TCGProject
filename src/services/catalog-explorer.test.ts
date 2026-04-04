@@ -151,7 +151,7 @@ describe("getCatalogSetCardsWithOwnership", () => {
         imageUrl: null,
         isOwned: false,
         ownedQuantity: 0,
-        inventoryId: null
+        inventoryIds: []
       },
       {
         id: "card-2",
@@ -161,7 +161,7 @@ describe("getCatalogSetCardsWithOwnership", () => {
         imageUrl: null,
         isOwned: true,
         ownedQuantity: 4,
-        inventoryId: "inv-1"
+        inventoryIds: ["inv-1"]
       }
     ]);
   });

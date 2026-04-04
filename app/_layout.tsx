@@ -22,7 +22,8 @@ export default function RootLayout() {
           contentStyle: { backgroundColor: "#f4f7fb" }
         }}
       >
-        <Stack.Screen name="index" options={{ title: "Mis cartas" }} />
+        <Stack.Screen name="index" options={{ title: "Mis colecciones" }} />
+        <Stack.Screen name="collections/[collectionId]" options={{ title: "Colección" }} />
         <Stack.Screen name="add-card" options={{ title: "Agregar carta" }} />
         <Stack.Screen name="sets/index" options={{ title: "Sets" }} />
         <Stack.Screen name="sets/[setId]" options={{ title: "Cartas del set" }} />

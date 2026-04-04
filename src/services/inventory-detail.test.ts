@@ -10,6 +10,8 @@ import {
 const SAMPLE_DETAIL = {
   inventoryId: "inv-1",
   cardId: "base1-1",
+  collectionId: "col-1",
+  collectionName: "Mi colección",
   name: "Alakazam",
   setId: "base1",
   setName: "Base Set",
@@ -34,6 +36,10 @@ describe("getInventoryCardDetail", () => {
         totalCollectionValueUsd: 20
       }),
       refreshCardPriceWithVariation: vi.fn(),
+      saveNativeInventoryItem: vi.fn(),
+      deleteNativeInventoryItem: vi.fn(),
+      updateNativeInventoryPriceSnapshot: vi.fn(),
+      moveNativeInventoryEntry: vi.fn(),
       readWebInventoryRows: vi.fn(),
       writeWebInventoryRows: vi.fn()
     });
@@ -51,6 +57,10 @@ describe("getInventoryCardDetail", () => {
           totalCollectionValueUsd: 20
         }),
         refreshCardPriceWithVariation: vi.fn(),
+        saveNativeInventoryItem: vi.fn(),
+        deleteNativeInventoryItem: vi.fn(),
+        updateNativeInventoryPriceSnapshot: vi.fn(),
+        moveNativeInventoryEntry: vi.fn(),
         readWebInventoryRows: vi.fn(),
         writeWebInventoryRows: vi.fn()
       })
@@ -64,6 +74,7 @@ describe("refreshInventoryCardPrice", () => {
       {
         id: "inv-1",
         cardId: "base1-1",
+        collectionId: "col-1",
         quantity: 2,
         condition: "Near Mint",
         priceUsd: 10,
@@ -106,6 +117,10 @@ describe("refreshInventoryCardPrice", () => {
       platformOS: "web",
       getInventoryOverview,
       refreshCardPriceWithVariation,
+      saveNativeInventoryItem: vi.fn(),
+      deleteNativeInventoryItem: vi.fn(),
+      updateNativeInventoryPriceSnapshot: vi.fn(),
+      moveNativeInventoryEntry: vi.fn(),
       readWebInventoryRows,
       writeWebInventoryRows
     });
@@ -134,6 +149,7 @@ describe("updateInventoryCardEntry", () => {
       {
         id: "inv-1",
         cardId: "base1-1",
+        collectionId: "col-1",
         quantity: 2,
         condition: "Near Mint",
         priceUsd: 10,
@@ -173,6 +189,8 @@ describe("updateInventoryCardEntry", () => {
         refreshCardPriceWithVariation: vi.fn(),
         saveNativeInventoryItem: vi.fn(),
         deleteNativeInventoryItem: vi.fn(),
+        updateNativeInventoryPriceSnapshot: vi.fn(),
+        moveNativeInventoryEntry: vi.fn(),
         readWebInventoryRows,
         writeWebInventoryRows
       }
@@ -205,6 +223,8 @@ describe("updateInventoryCardEntry", () => {
           refreshCardPriceWithVariation: vi.fn(),
           saveNativeInventoryItem: vi.fn(),
           deleteNativeInventoryItem: vi.fn(),
+          updateNativeInventoryPriceSnapshot: vi.fn(),
+          moveNativeInventoryEntry: vi.fn(),
           readWebInventoryRows: vi.fn(),
           writeWebInventoryRows: vi.fn()
         }
@@ -225,16 +245,18 @@ describe("deleteInventoryCardEntry", () => {
         refreshCardPriceWithVariation: vi.fn(),
         saveNativeInventoryItem: vi.fn(),
         deleteNativeInventoryItem: vi.fn(),
+        updateNativeInventoryPriceSnapshot: vi.fn(),
+        moveNativeInventoryEntry: vi.fn(),
         readWebInventoryRows: vi.fn().mockReturnValue([
-          { id: "inv-1", cardId: "base1-1", quantity: 1, condition: "Near Mint" },
-          { id: "inv-2", cardId: "base1-2", quantity: 2, condition: "Lightly Played" }
+          { id: "inv-1", cardId: "base1-1", collectionId: "col-1", quantity: 1, condition: "Near Mint" },
+          { id: "inv-2", cardId: "base1-2", collectionId: "col-1", quantity: 2, condition: "Lightly Played" }
         ]),
         writeWebInventoryRows
       }
     );
 
     expect(writeWebInventoryRows).toHaveBeenCalledWith([
-      { id: "inv-2", cardId: "base1-2", quantity: 2, condition: "Lightly Played" }
+      { id: "inv-2", cardId: "base1-2", collectionId: "col-1", quantity: 2, condition: "Lightly Played" }
     ]);
   });
 });

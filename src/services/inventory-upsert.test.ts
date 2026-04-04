@@ -12,11 +12,12 @@ describe("addCardToInventory", () => {
           number: "1",
           name: "Alakazam",
           quantity: 0,
-          condition: "Near Mint"
+          condition: "Near Mint",
+          collectionId: "col-1"
         },
         {
           platformOS: "web",
-          getInventoryItemByCardId: vi.fn(),
+          getInventoryItemByCardIdCollectionIdAndCondition: vi.fn(),
           getPriceCacheByCardId: vi.fn().mockResolvedValue(null),
           saveInventoryItem: vi.fn(),
           syncCardPriceWithMatching: vi.fn(),
@@ -38,11 +39,12 @@ describe("addCardToInventory", () => {
         name: "Alakazam",
         quantity: 2,
         condition: "Near Mint",
+        collectionId: "col-1",
         isOffline: true
       },
       {
         platformOS: "web",
-        getInventoryItemByCardId: vi.fn(),
+        getInventoryItemByCardIdCollectionIdAndCondition: vi.fn(),
         getPriceCacheByCardId: vi.fn().mockResolvedValue(null),
         saveInventoryItem: vi.fn(),
         syncCardPriceWithMatching: vi.fn(),
@@ -68,11 +70,12 @@ describe("addCardToInventory", () => {
         name: "Alakazam",
         quantity: 3,
         condition: "Lightly Played",
+        collectionId: "col-1",
         isOffline: true
       },
       {
         platformOS: "web",
-        getInventoryItemByCardId: vi.fn(),
+        getInventoryItemByCardIdCollectionIdAndCondition: vi.fn(),
         getPriceCacheByCardId: vi.fn().mockResolvedValue(null),
         saveInventoryItem: vi.fn(),
         syncCardPriceWithMatching: vi.fn(),
@@ -80,8 +83,9 @@ describe("addCardToInventory", () => {
           {
             id: "inv-existing",
             cardId: "base1-1",
+            collectionId: "col-1",
             quantity: 2,
-            condition: "Near Mint",
+            condition: "Lightly Played",
             priceUsd: 10,
             priceTimestamp: "2026-03-21T10:00:00.000Z"
           }
@@ -126,11 +130,12 @@ describe("addCardToInventory", () => {
         number: "1",
         name: "Alakazam",
         quantity: 1,
-        condition: "Near Mint"
+        condition: "Near Mint",
+        collectionId: "col-1"
       },
       {
         platformOS: "android",
-        getInventoryItemByCardId: vi.fn().mockResolvedValue(null),
+        getInventoryItemByCardIdCollectionIdAndCondition: vi.fn().mockResolvedValue(null),
         getPriceCacheByCardId: vi.fn().mockResolvedValue(null),
         saveInventoryItem,
         syncCardPriceWithMatching,
@@ -166,11 +171,12 @@ describe("addCardToInventory", () => {
         number: "1",
         name: "Alakazam",
         quantity: 1,
-        condition: "Near Mint"
+        condition: "Near Mint",
+        collectionId: "col-1"
       },
       {
         platformOS: "android",
-        getInventoryItemByCardId: vi.fn().mockResolvedValue(null),
+        getInventoryItemByCardIdCollectionIdAndCondition: vi.fn().mockResolvedValue(null),
         getPriceCacheByCardId: vi.fn().mockResolvedValue(null),
         saveInventoryItem,
         syncCardPriceWithMatching: vi.fn().mockResolvedValue({
@@ -206,11 +212,12 @@ describe("addCardToInventory", () => {
         number: "1",
         name: "Alakazam",
         quantity: 1,
-        condition: "Near Mint"
+        condition: "Near Mint",
+        collectionId: "col-1"
       },
       {
         platformOS: "android",
-        getInventoryItemByCardId: vi.fn().mockResolvedValue(null),
+        getInventoryItemByCardIdCollectionIdAndCondition: vi.fn().mockResolvedValue(null),
         getPriceCacheByCardId: vi.fn().mockResolvedValue({
           currentPriceUsd: "9.75",
           fetchedAt: new Date("2026-03-21T10:00:00.000Z")

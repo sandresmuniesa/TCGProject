@@ -2,8 +2,13 @@ import { Platform } from "react-native";
 
 import type { CardCondition } from "@/constants/card-condition";
 import { calculatePriceVariationPercent } from "@/services/price-variation";
+import {
+  WEB_INVENTORY_ITEMS_V2_KEY,
+  readWebCollections,
+  type WebCollectionRow
+} from "@/services/web-storage";
 
-const WEB_INVENTORY_ITEMS_KEY = "tcg:inventory:items:v1";
+const WEB_INVENTORY_ITEMS_KEY = WEB_INVENTORY_ITEMS_V2_KEY;
 const WEB_SETS_CACHE_KEY = "tcg:catalog:sets:v1";
 const WEB_SET_CARDS_CACHE_KEY_PREFIX = "tcg:catalog:cards:set:v2:";
 const WEB_PRICE_CACHE_KEY_PREFIX = "tcg:price:card:";
@@ -11,6 +16,8 @@ const WEB_PRICE_CACHE_KEY_PREFIX = "tcg:price:card:";
 export type InventoryOverviewItem = {
   inventoryId: string;
   cardId: string;
+  collectionId: string;
+  collectionName: string;
   name: string;
   setId: string;
   setName: string;
@@ -44,6 +51,8 @@ export type InventorySetFilterOption = {
 type NativeInventoryDetailRow = {
   inventoryId: string;
   cardId: string;
+  collectionId: string | null;
+  collectionName: string | null;
   quantity: number;
   condition: CardCondition;
   priceUsd: number | string | null;
@@ -60,6 +69,7 @@ type NativeInventoryDetailRow = {
 type WebInventoryRow = {
   id: string;
   cardId: string;
+  collectionId: string;
   quantity: number;
   condition: CardCondition;
   priceUsd?: number | null;
@@ -89,6 +99,7 @@ type InventoryOverviewDeps = {
   platformOS: string;
   getNativeInventoryDetails: () => Promise<NativeInventoryDetailRow[]>;
   readWebInventoryRows: () => WebInventoryRow[];
+  readWebCollections: () => WebCollectionRow[];
   readWebSets: () => WebSetRow[];
   readWebCardsBySetId: (setId: string) => WebCardRow[];
   readWebPriceCacheByCardId: (cardId: string) => WebPriceCacheRow | null;
@@ -187,14 +198,20 @@ export function filterInventoryItems(items: InventoryOverviewItem[], params: Inv
   });
 }
 
-function mapNativeRowsToOverview(rows: NativeInventoryDetailRow[]) {
-  const items: InventoryOverviewItem[] = rows.map((row) => {
+function mapNativeRowsToOverview(rows: NativeInventoryDetailRow[], collectionIdFilter: string | null) {
+  const filtered = collectionIdFilter
+    ? rows.filter((r) => r.collectionId === collectionIdFilter)
+    : rows;
+
+  const items: InventoryOverviewItem[] = filtered.map((row) => {
     const priceUsd = normalizeNullableNumber(row.priceUsd);
     const currentPriceUsd = normalizeNullableNumber(row.currentPriceUsd);
 
     return {
       inventoryId: row.inventoryId,
       cardId: row.cardId,
+      collectionId: row.collectionId ?? "",
+      collectionName: row.collectionName ?? "Colección desconocida",
       name: row.cardName ?? "Carta sin nombre",
       setId: row.setId ?? "unknown-set",
       setName: row.setName ?? "Set desconocido",
@@ -213,9 +230,13 @@ function mapNativeRowsToOverview(rows: NativeInventoryDetailRow[]) {
   return calculateSummary(items);
 }
 
-function mapWebRowsToOverview(deps: InventoryOverviewDeps) {
-  const inventoryRows = deps.readWebInventoryRows();
+function mapWebRowsToOverview(deps: InventoryOverviewDeps, collectionIdFilter: string | null) {
+  const allInventoryRows = deps.readWebInventoryRows();
+  const inventoryRows = collectionIdFilter
+    ? allInventoryRows.filter((r) => r.collectionId === collectionIdFilter)
+    : allInventoryRows;
   const setRows = deps.readWebSets();
+  const collectionRows = deps.readWebCollections();
 
   if (inventoryRows.length === 0) {
     return {
@@ -226,6 +247,7 @@ function mapWebRowsToOverview(deps: InventoryOverviewDeps) {
   }
 
   const setMap = new Map(setRows.map((set) => [set.id, set.name]));
+  const collectionMap = new Map(collectionRows.map((c) => [c.id, c.name]));
   const cardMap = new Map<string, WebCardRow>();
 
   for (const set of setRows) {
@@ -247,6 +269,8 @@ function mapWebRowsToOverview(deps: InventoryOverviewDeps) {
       return {
         inventoryId: row.id,
         cardId: row.cardId,
+        collectionId: row.collectionId,
+        collectionName: collectionMap.get(row.collectionId) ?? "Colección desconocida",
         name: card?.name ?? row.cardId,
         setId: card?.setId ?? "unknown-set",
         setName: card?.setId ? (setMap.get(card.setId) ?? "Set desconocido") : "Set desconocido",
@@ -273,16 +297,27 @@ const defaultDeps: InventoryOverviewDeps = {
     return (await getInventoryItemDetails()) as NativeInventoryDetailRow[];
   },
   readWebInventoryRows: () => readWebArrayCache<WebInventoryRow>(WEB_INVENTORY_ITEMS_KEY),
+  readWebCollections,
   readWebSets: () => readWebArrayCache<WebSetRow>(WEB_SETS_CACHE_KEY),
   readWebCardsBySetId: (setId) => readWebArrayCache<WebCardRow>(`${WEB_SET_CARDS_CACHE_KEY_PREFIX}${setId}`),
   readWebPriceCacheByCardId: (cardId) => readWebCache<WebPriceCacheRow>(`${WEB_PRICE_CACHE_KEY_PREFIX}${cardId}`)
 };
 
-export async function getInventoryOverview(deps: InventoryOverviewDeps = defaultDeps): Promise<InventoryOverview> {
+export async function getInventoryOverview(
+  collectionIdFilter: string | null = null,
+  deps: InventoryOverviewDeps = defaultDeps
+): Promise<InventoryOverview> {
   if (deps.platformOS === "web") {
-    return mapWebRowsToOverview(deps);
+    return mapWebRowsToOverview(deps, collectionIdFilter);
   }
 
   const nativeRows = await deps.getNativeInventoryDetails();
-  return mapNativeRowsToOverview(nativeRows);
+  return mapNativeRowsToOverview(nativeRows, collectionIdFilter);
+}
+
+export async function getCollectionInventoryOverview(
+  collectionId: string,
+  deps: InventoryOverviewDeps = defaultDeps
+): Promise<InventoryOverview> {
+  return getInventoryOverview(collectionId, deps);
 }
