@@ -58,7 +58,6 @@ CREATE TABLE IF NOT EXISTS price_cache (
 CREATE INDEX IF NOT EXISTS cards_set_id_idx ON cards(set_id);
 CREATE INDEX IF NOT EXISTS cards_name_idx ON cards(name);
 CREATE INDEX IF NOT EXISTS inventory_card_id_idx ON inventory(card_id);
-CREATE INDEX IF NOT EXISTS inventory_collection_id_idx ON inventory(collection_id);
 `;
 
 // The ID used for the auto-created initial collection during migration.
@@ -74,7 +73,23 @@ function applyMigration0001(sqlite: SQLiteDatabase): void {
     "SELECT name FROM pragma_table_info('inventory') WHERE name = 'collection_id'"
   );
   if (row) {
-    // Column already present — migration was already applied.
+    // Column already present — migration was already applied (or this is a fresh install).
+    // Ensure the collection_id index exists: it may be absent on fresh installs because
+    // INITIAL_SCHEMA_SQL deliberately omits it (to avoid failing on existing DBs that
+    // don't have the column yet).
+    sqlite.execSync(
+      "CREATE INDEX IF NOT EXISTS inventory_collection_id_idx ON inventory(collection_id);"
+    );
+    // Ensure at least one collection exists: fresh installs skip the migration body, so
+    // the collections table is empty until the user creates one — pre-seed it here.
+    const colCount = sqlite.getFirstSync<{ cnt: number } | null>(
+      "SELECT COUNT(*) as cnt FROM collections"
+    );
+    if (!colCount || colCount.cnt === 0) {
+      sqlite.execSync(
+        `INSERT INTO collections (id, name, created_at) VALUES ('${MIGRATION_0001_INITIAL_COLLECTION_ID}', 'Mi colección', ${Date.now()});`
+      );
+    }
     return;
   }
 
@@ -86,7 +101,7 @@ function applyMigration0001(sqlite: SQLiteDatabase): void {
 
   if (!firstCollection) {
     sqlite.execSync(
-      `INSERT INTO collections (id, name, created_at) VALUES ('${collectionId}', 'Mi colección', CAST(unixepoch('subsec') * 1000 AS INTEGER));`
+      `INSERT INTO collections (id, name, created_at) VALUES ('${collectionId}', 'Mi colección', ${Date.now()});`
     );
   }
 

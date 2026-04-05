@@ -1,9 +1,9 @@
-import { useState } from "react";
+import { useCallback, useState } from "react";
 
-import { Modal, Pressable, SafeAreaView, ScrollView, Text, TextInput, View } from "react-native";
+import { Modal, Pressable, RefreshControl, SafeAreaView, ScrollView, Text, TextInput, View } from "react-native";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useRouter } from "expo-router";
+import { useFocusEffect, useRouter } from "expo-router";
 
 import {
   createCollection,
@@ -59,6 +59,12 @@ export default function CollectionsScreen() {
     queryKey: ["collections-summary", sortBy, sortDir],
     queryFn: () => getCollectionsSummary(sortBy, sortDir)
   });
+
+  useFocusEffect(
+    useCallback(() => {
+      queryClient.invalidateQueries({ queryKey: ["collections-summary"] });
+    }, [queryClient])
+  );
 
   const collections = collectionsQuery.data ?? [];
 
@@ -129,7 +135,15 @@ export default function CollectionsScreen() {
 
   return (
     <SafeAreaView className="flex-1 bg-mist">
-      <ScrollView contentContainerStyle={{ padding: 24 }}>
+      <ScrollView
+        contentContainerStyle={{ padding: 24 }}
+        refreshControl={
+          <RefreshControl
+            refreshing={collectionsQuery.isFetching}
+            onRefresh={() => queryClient.invalidateQueries({ queryKey: ["collections-summary"] })}
+          />
+        }
+      >
         <View className="w-full self-center max-w-3xl gap-4">
           <View className="rounded-3xl bg-ink p-6">
             <Text className="text-3xl font-bold text-mist">Mis colecciones</Text>
